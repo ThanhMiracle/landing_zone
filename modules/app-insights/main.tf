@@ -1,0 +1,26 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+resource "azurerm_application_insights" "this" {
+  name                = "${var.name_prefix}-${var.environment}-appi"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  application_type    = var.application_type
+  workspace_id        = var.workspace_id
+
+  tags = merge(
+    {
+      Project     = var.name_prefix
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    },
+    var.tags
+  )
+}
