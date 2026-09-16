@@ -30,3 +30,5 @@ provider_generated.tf
 # Terragrunt working directory
 .terragrunt-cache/
 .terragrunt-cache-*
+draft.MD
+DEPLOYMENT_NOTES.md

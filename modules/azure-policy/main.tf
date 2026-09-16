@@ -14,7 +14,7 @@ terraform {
 
 data "azurerm_policy_set_definition" "azure_security_benchmark" {
   count        = var.deploy_azure_security_benchmark ? 1 : 0
-  display_name = "Microsoft Cloud Security Benchmark"
+  display_name = "Microsoft cloud security benchmark"
 }
 
 data "azurerm_policy_set_definition" "cis_foundations" {

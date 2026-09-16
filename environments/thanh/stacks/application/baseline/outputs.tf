@@ -13,17 +13,40 @@
 # =============================================================================
 
 output "spoke_vnet_id" {
-  description = "Resource ID of the spoke VNet deployed in the application subscription. Consumed by workload stacks for subnet lookups and private endpoint placement."
+  description = "Resource ID of the spoke VNet deployed in the application subscription."
   value       = module.vnet.vnet_id
 }
 
+output "spoke_resource_group_name" {
+  description = "Name of the resource group that contains all baseline spoke resources."
+  value       = module.resource_group.name
+}
+
+# -----------------------------------------------------------------------------
+# Subnet outputs
+# -----------------------------------------------------------------------------
+
+output "aks_subnet_id" {
+  description = "Resource ID of the AKS subnet in the spoke VNet."
+  value       = module.vnet.subnet_ids["aks"]
+}
+
+output "data_subnet_id" {
+  description = "Resource ID of the delegated data subnet used by PostgreSQL Flexible Server."
+  value       = module.vnet.subnet_ids["data"]
+}
+
+# -----------------------------------------------------------------------------
+# Shared platform resources
+# -----------------------------------------------------------------------------
+
 output "key_vault_id" {
-  description = "Resource ID of the Key Vault deployed in the baseline stack. Consumed by workload stacks to store and retrieve secrets."
+  description = "Resource ID of the Key Vault deployed in the baseline stack."
   value       = module.key_vault.key_vault_id
 }
 
 output "managed_identity_id" {
-  description = "Resource ID of the user-assigned Managed Identity deployed in the baseline stack. Consumed by workload stacks (AKS, app services) for passwordless Azure authentication."
+  description = "Resource ID of the user-assigned Managed Identity deployed in the baseline stack."
   value       = module.managed_identity.id
 }
 
@@ -37,6 +60,10 @@ output "container_registry_login_server" {
   value       = module.container_registry.login_server
 }
 
+# -----------------------------------------------------------------------------
+# Observability
+# -----------------------------------------------------------------------------
+
 output "application_insights_connection_string" {
   description = "Application Insights connection string for the Agent API and worker workloads."
   value       = module.application_insights.connection_string
@@ -46,14 +73,4 @@ output "application_insights_connection_string" {
 output "application_insights_app_id" {
   description = "Application Insights application ID for querying telemetry."
   value       = module.application_insights.app_id
-}
-
-output "spoke_resource_group_name" {
-  description = "Name of the resource group that contains all baseline spoke resources. Consumed by workload stacks that must deploy into the same resource group."
-  value       = module.resource_group.name
-}
-
-output "aks_subnet_id" {
-  description = "Resource ID của subnet 'aks' trong spoke VNet. Consumed by AKS workload stack để tích hợp VNet (R6)."
-  value       = module.vnet.subnet_ids["aks"]
 }

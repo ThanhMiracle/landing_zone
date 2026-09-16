@@ -32,7 +32,7 @@ EOF
 inputs = {
   subscription_id = local.env_vars.locals.management_subscription_id
   name_prefix     = local.env_vars.locals.name_prefix
-  environment     = local.env_vars.locals.environment
+  environment     = "management"
   location        = local.env_vars.locals.location
   tags            = local.env_vars.locals.common_tags
 }

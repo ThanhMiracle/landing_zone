@@ -18,8 +18,8 @@
 # Private DNS zone in the same resource group.
 data "azurerm_virtual_network" "spoke" {
   provider            = azurerm.workload
-  name                = "${var.name_prefix}-${var.environment}-spoke-vnet"
-  resource_group_name = "${var.name_prefix}-${var.environment}-spoke-rg"
+  name                = "${var.name_prefix}-${var.environment}-vnet"
+  resource_group_name = var.resource_group_name
 }
 
 # The "data" subnet carries the PostgreSQL flexibleServers delegation.
@@ -70,8 +70,8 @@ module "postgresql" {
   }
 
   # Naming: <name_prefix>-<environment>-psql  (R15.2, R15.3)
-  name_prefix  = var.name_prefix
-  environment  = "${var.environment}-psql"
+  name_prefix = var.name_prefix
+  environment = "${var.environment}-psql"
 
   resource_group_name = data.azurerm_virtual_network.spoke.resource_group_name
   location            = var.location

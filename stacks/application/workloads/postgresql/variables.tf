@@ -23,6 +23,11 @@ variable "spoke_vnet_id" {
   type        = string
 }
 
+variable "resource_group_name" {
+  description = "Name of the spoke resource group from the baseline stack."
+  type        = string
+}
+
 variable "key_vault_id" {
   description = "Resource ID of the Key Vault from the baseline stack. Used for customer-managed encryption key (CMK) if required."
   type        = string

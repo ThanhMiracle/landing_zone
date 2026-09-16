@@ -3,6 +3,19 @@
 # Tenant Root → Platform (connectivity, management, identity, security subs)
 #             → Application Landing Zones (app subs)
 
+locals {
+  platform_subscription_ids = distinct(compact([
+    var.connectivity_subscription_id,
+    var.management_subscription_id,
+    var.identity_subscription_id,
+    var.security_subscription_id,
+  ]))
+
+  # A subscription can belong to only one management group. In a
+  # single-subscription environment, it remains under Platform.
+  application_subscription_ids = contains(local.platform_subscription_ids, var.app_subscription_id) ? [] : compact([var.app_subscription_id])
+}
+
 module "tenant_root" {
   source = "../../modules/management-group"
 
@@ -19,12 +32,7 @@ module "platform" {
   display_name               = "Platform"
   name_prefix                = var.name_prefix
   parent_management_group_id = module.tenant_root.management_group_id
-  subscriptions = compact([
-    var.connectivity_subscription_id,
-    var.management_subscription_id,
-    var.identity_subscription_id,
-    var.security_subscription_id,
-  ])
+  subscriptions              = local.platform_subscription_ids
 }
 
 module "application" {
@@ -34,7 +42,7 @@ module "application" {
   display_name               = "Application Landing Zones"
   name_prefix                = var.name_prefix
   parent_management_group_id = module.tenant_root.management_group_id
-  subscriptions              = compact([var.app_subscription_id])
+  subscriptions              = local.application_subscription_ids
 }
 
 # ---------------------------------------------------------------------------

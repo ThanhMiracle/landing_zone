@@ -14,5 +14,5 @@ resource "azurerm_management_group_subscription_association" "this" {
   for_each = toset(var.subscriptions)
 
   management_group_id = azurerm_management_group.this.id
-  subscription_id     = each.value
+  subscription_id     = startswith(each.value, "/subscriptions/") ? each.value : "/subscriptions/${each.value}"
 }
