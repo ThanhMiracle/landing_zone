@@ -100,7 +100,8 @@ variable "application_rule_collections" {
         type = string
         port = number
       }))
-      destination_fqdns = list(string)
+      destination_fqdns     = optional(list(string), [])
+      destination_fqdn_tags = optional(list(string), [])
     }))
   }))
   default = {}

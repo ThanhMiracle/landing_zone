@@ -41,6 +41,6 @@ variable "routes" {
 }
 
 variable "subnet_ids" {
-  description = "List of subnet resource IDs to associate with this route table. All listed subnets will share the same route table."
-  type        = list(string)
+  description = "Map of stable subnet names to subnet resource IDs to associate with this route table. All listed subnets will share the same route table."
+  type        = map(string)
 }

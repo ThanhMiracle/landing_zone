@@ -80,9 +80,10 @@ resource "azurerm_firewall_policy_rule_collection_group" "this" {
       dynamic "rule" {
         for_each = application_rule_collection.value.rules
         content {
-          name              = rule.value.name
-          source_addresses  = rule.value.source_addresses
-          destination_fqdns = rule.value.destination_fqdns
+          name                  = rule.value.name
+          source_addresses      = rule.value.source_addresses
+          destination_fqdns     = rule.value.destination_fqdns
+          destination_fqdn_tags = rule.value.destination_fqdn_tags
 
           dynamic "protocols" {
             for_each = rule.value.protocols

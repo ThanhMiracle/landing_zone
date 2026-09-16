@@ -36,7 +36,9 @@ resource "azurerm_route" "this" {
 }
 
 resource "azurerm_subnet_route_table_association" "this" {
-  for_each = toset(var.subnet_ids)
+  # Map keys are known during plan even when subnet IDs are created in the
+  # same apply. This avoids using unknown resource IDs as for_each keys.
+  for_each = var.subnet_ids
 
   subnet_id      = each.value
   route_table_id = azurerm_route_table.this.id
