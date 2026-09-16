@@ -5,7 +5,7 @@ include "root" {
 
 # Download the repository root so Terraform's local ../../.. module paths stay valid in Terragrunt's cache.
 terraform {
-  source = "${get_path_to_repo_root()}//${path_relative_to_include()}"
+  source = "${dirname(dirname(get_parent_terragrunt_dir()))}//${path_relative_to_include()}"
 }
 
 locals {
