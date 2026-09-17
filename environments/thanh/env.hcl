@@ -24,7 +24,7 @@ locals {
 
   # ── Platform Feature Flags (R10.4) ────────────────────────────────────────
   # Bật/tắt từng platform stack mà không thay đổi code.
-  deploy_management_groups = true    # Deploy Management Group hierarchy
+  deploy_management_groups = false    # Deploy Management Group hierarchy
   deploy_connectivity      = true    # Deploy Hub VNet, Firewall, DNS, VPN
   deploy_management        = true    # Deploy Log Analytics, Defender
   deploy_identity          = false   # Scaffold only — tắt mặc định (R6, R10.10)
@@ -42,6 +42,7 @@ locals {
   deploy_aks        = true    # AKS cluster trong application subscription
   deploy_postgresql = true    # PostgreSQL Flexible Server
   deploy_redis      = false   # Azure Cache for Redis
+  deploy_blob_storage = true    # Private Blob container for data written by AKS workloads
   # R2: deploy_service_bus thay thế deploy_apim cho Service Bus workload — đọc bởi workloads/service-bus/terragrunt.hcl
   deploy_service_bus = false  # Azure Service Bus Namespace trong application subscription
   deploy_apim        = false  # DEPRECATED: thay thế bởi deploy_service_bus

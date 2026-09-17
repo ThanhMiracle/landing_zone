@@ -1,0 +1,41 @@
+variable "subscription_id" {
+  description = "Azure subscription ID that hosts the application workloads."
+  type        = string
+}
+
+variable "name_prefix" {
+  description = "Lowercase prefix used in resource names."
+  type        = string
+}
+
+variable "environment" {
+  description = "Deployment environment name."
+  type        = string
+}
+
+variable "location" {
+  description = "Azure region for the storage account."
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Baseline spoke resource group that hosts the storage account."
+  type        = string
+}
+
+variable "aks_cluster_name" {
+  description = "Name of the deployed AKS cluster whose kubelet identity receives Blob Data Contributor."
+  type        = string
+}
+
+variable "log_analytics_workspace_id" {
+  description = "Central Log Analytics workspace ID for Blob diagnostics."
+  type        = string
+  default     = null
+}
+
+variable "tags" {
+  description = "Additional tags applied to resources."
+  type        = map(string)
+  default     = {}
+}
