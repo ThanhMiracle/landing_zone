@@ -1,7 +1,7 @@
 # infra/stacks/application/workloads/postgresql/terragrunt.hcl
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 terraform {
@@ -44,8 +44,10 @@ dependency "baseline" {
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 
@@ -61,8 +63,10 @@ dependency "management" {
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 

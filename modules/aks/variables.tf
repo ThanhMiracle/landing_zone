@@ -37,6 +37,23 @@ variable "private_cluster_enabled" {
   default     = false
 }
 
+variable "identity_id" {
+  description = "Optional user-assigned identity resource ID for the AKS control plane."
+  type        = string
+  default     = null
+}
+
+variable "outbound_type" {
+  description = "Outbound routing mode for the AKS cluster."
+  type        = string
+  default     = "loadBalancer"
+
+  validation {
+    condition     = contains(["loadBalancer", "userDefinedRouting"], var.outbound_type)
+    error_message = "outbound_type must be loadBalancer or userDefinedRouting."
+  }
+}
+
 variable "enable_azure_ad_rbac" {
   description = "Whether to enable Azure AD-integrated RBAC for the cluster"
   type        = bool

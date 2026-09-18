@@ -60,6 +60,12 @@ variable "aks_subnet_address_prefixes" {
   default     = []
 }
 
+variable "aks_additional_fqdns" {
+  description = "Additional HTTPS endpoints required by enabled AKS add-ons and Thanh workloads."
+  type        = list(string)
+  default     = []
+}
+
 # ---------------------------------------------------------------------------
 # Hub networking
 # ---------------------------------------------------------------------------

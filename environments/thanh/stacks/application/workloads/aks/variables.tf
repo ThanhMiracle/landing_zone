@@ -20,19 +20,40 @@ variable "location" {
   type        = string
 }
 
-variable "spoke_vnet_id" {
-  description = "Resource ID of the spoke VNet from the baseline stack. Used for subnet lookups and network integration."
-  type        = string
-}
-
 variable "key_vault_id" {
   description = "Resource ID of the Key Vault from the baseline stack. Used for secret storage and CSI driver integration."
   type        = string
 }
 
 variable "managed_identity_id" {
-  description = "Resource ID of the user-assigned managed identity from the baseline stack. Used for workload identity."
+  description = "Resource ID of the user-assigned managed identity used by the AKS control plane."
   type        = string
+}
+
+variable "managed_identity_principal_id" {
+  description = "Principal ID of the AKS control-plane managed identity."
+  type        = string
+}
+
+variable "aks_route_table_id" {
+  description = "Resource ID of the custom route table associated with the AKS subnet, or null when forced tunneling is disabled."
+  type        = string
+  nullable    = true
+}
+
+variable "container_registry_id" {
+  description = "Resource ID of the Azure Container Registry used by AKS workloads."
+  type        = string
+}
+
+variable "outbound_type" {
+  description = "AKS outbound routing mode. Use userDefinedRouting when the spoke subnet routes through Azure Firewall."
+  type        = string
+
+  validation {
+    condition     = contains(["loadBalancer", "userDefinedRouting"], var.outbound_type)
+    error_message = "outbound_type must be loadBalancer or userDefinedRouting."
+  }
 }
 
 variable "resource_group_name" {

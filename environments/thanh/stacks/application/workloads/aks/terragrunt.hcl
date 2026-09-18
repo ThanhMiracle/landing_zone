@@ -1,5 +1,5 @@
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 terraform {
@@ -11,6 +11,7 @@ locals {
 
   app_subscription_id        = local.env_vars.locals.app_subscription_id
   management_subscription_id = local.env_vars.locals.management_subscription_id
+  aks_outbound_type          = local.env_vars.locals.deploy_firewall ? "userDefinedRouting" : "loadBalancer"
 
   mock_spoke_rg = "mock-spoke-rg"
 }
@@ -24,22 +25,26 @@ dependency "baseline" {
   config_path = "../../baseline"
 
   mock_outputs = {
-    spoke_vnet_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.Network/virtualNetworks/mock-spoke-vnet"
-
     key_vault_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.KeyVault/vaults/mock-kv"
 
     managed_identity_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mock-mi"
+
+    managed_identity_principal_id = "00000000-0000-0000-0000-000000000001"
 
     spoke_resource_group_name = local.mock_spoke_rg
 
     aks_subnet_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.Network/virtualNetworks/mock-spoke-vnet/subnets/aks"
 
+    aks_route_table_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.Network/routeTables/mock-aks-rt"
+
     container_registry_id = "/subscriptions/${local.app_subscription_id}/resourceGroups/${local.mock_spoke_rg}/providers/Microsoft.ContainerRegistry/registries/mockacr"
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 
@@ -51,8 +56,10 @@ dependency "management" {
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 
@@ -75,12 +82,14 @@ inputs = {
   environment     = local.env_vars.locals.environment
   location        = local.env_vars.locals.location
 
-  spoke_vnet_id         = dependency.baseline.outputs.spoke_vnet_id
-  key_vault_id          = dependency.baseline.outputs.key_vault_id
-  managed_identity_id   = dependency.baseline.outputs.managed_identity_id
-  resource_group_name   = dependency.baseline.outputs.spoke_resource_group_name
-  aks_subnet_id         = dependency.baseline.outputs.aks_subnet_id
-  container_registry_id = dependency.baseline.outputs.container_registry_id
+  key_vault_id                  = dependency.baseline.outputs.key_vault_id
+  managed_identity_id           = dependency.baseline.outputs.managed_identity_id
+  managed_identity_principal_id = dependency.baseline.outputs.managed_identity_principal_id
+  resource_group_name           = dependency.baseline.outputs.spoke_resource_group_name
+  aks_subnet_id                 = dependency.baseline.outputs.aks_subnet_id
+  aks_route_table_id            = dependency.baseline.outputs.aks_route_table_id
+  container_registry_id         = dependency.baseline.outputs.container_registry_id
+  outbound_type                 = local.aks_outbound_type
 
   log_analytics_workspace_id = dependency.management.outputs.log_analytics_workspace_id
 

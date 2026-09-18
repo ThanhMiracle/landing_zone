@@ -1,7 +1,7 @@
 # infra/stacks/application/baseline/terragrunt.hcl
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Download the repository root so Terraform's local ../../.. module paths
@@ -52,8 +52,10 @@ dependency "connectivity" {
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 
@@ -66,14 +68,13 @@ dependency "management" {
 
   mock_outputs = {
     log_analytics_workspace_id = local.mock_log_analytics_workspace_id
-
-    # Mock only. Real value comes from platform/management state during apply.
-    log_analytics_workspace_key = "mock-workspace-key"
   }
 
   mock_outputs_allowed_terraform_commands = [
+    "init",
     "validate",
-    "plan"
+    "plan",
+    "destroy"
   ]
 }
 
@@ -90,7 +91,13 @@ provider "azurerm" {
   alias           = "workload"
   subscription_id = "${local.app_subscription_id}"
 
-  features {}
+  features {
+    resource_group {
+      # Application Insights creates a smart-detection action group outside
+      # Terraform state. This RG is dedicated to the Thanh environment.
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
 
 provider "azurerm" {
@@ -129,10 +136,6 @@ inputs = {
   # Management / Observability
   log_analytics_workspace_id = (
     dependency.management.outputs.log_analytics_workspace_id
-  )
-
-  log_analytics_workspace_key = (
-    dependency.management.outputs.log_analytics_workspace_key
   )
 
   tags = local.env_vars.locals.common_tags

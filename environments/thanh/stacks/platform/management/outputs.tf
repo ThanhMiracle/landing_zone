@@ -8,9 +8,3 @@ output "log_analytics_workspace_id" {
   value       = module.log_analytics.workspace_resource_id
   description = "ARM resource ID of the central Log Analytics workspace. Consumed by Baseline_Stack and all Workload_Stacks via dependency block output."
 }
-
-output "log_analytics_workspace_key" {
-  value       = module.log_analytics.workspace_key
-  sensitive   = true
-  description = "Primary shared key of the Log Analytics workspace. Sensitive — used for agent onboarding. Consumed by Baseline_Stack via dependency block output."
-}

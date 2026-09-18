@@ -1,6 +1,6 @@
 # infra/stacks/application/workloads/redis/terragrunt.hcl
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Download the repository root so Terraform's local ../../.. module paths stay valid in Terragrunt's cache.
@@ -25,7 +25,7 @@ dependency "baseline" {
     managed_identity_id       = "mock-mi-id"
     spoke_resource_group_name = "mock-spoke-rg"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 dependency "management" {
@@ -33,7 +33,7 @@ dependency "management" {
   mock_outputs = {
     log_analytics_workspace_id = "mock-workspace-id"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
 
 generate "provider" {

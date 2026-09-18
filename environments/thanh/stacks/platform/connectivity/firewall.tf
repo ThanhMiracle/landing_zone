@@ -18,9 +18,24 @@ module "firewall" {
   location            = var.location
   resource_group_name = module.resource_group.name
   subnet_id           = module.hub_vnet.subnet_ids["AzureFirewallSubnet"]
+  network_rule_collections = length(var.aks_subnet_address_prefixes) > 0 ? {
+    aks_azure_services = {
+      priority = 100
+      action   = "Allow"
+      rules = [
+        {
+          name                  = "aks-monitoring-and-registry"
+          protocols             = ["TCP"]
+          source_addresses      = var.aks_subnet_address_prefixes
+          destination_addresses = ["AzureMonitor", "AzureContainerRegistry"]
+          destination_ports     = ["443"]
+        },
+      ]
+    }
+  } : {}
   application_rule_collections = length(var.aks_subnet_address_prefixes) > 0 ? {
     aks_platform = {
-      priority = 100
+      priority = 200
       action   = "Allow"
       rules = [
         {
@@ -30,6 +45,14 @@ module "firewall" {
           protocols = [
             { type = "Https", port = 443 },
             { type = "Http", port = 80 },
+          ]
+        },
+        {
+          name              = "aks-enabled-services"
+          source_addresses  = var.aks_subnet_address_prefixes
+          destination_fqdns = var.aks_additional_fqdns
+          protocols = [
+            { type = "Https", port = 443 },
           ]
         },
       ]

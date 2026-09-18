@@ -1,7 +1,7 @@
 # infra/stacks/application/workloads/aks/main.tf
 # Workload template: AKS cluster deployed in the application spoke subscription.
 # Dependencies:
-#   - baseline stack: spoke_vnet_id, key_vault_id, managed_identity_id, resource_group_name, aks_subnet_id
+#   - baseline stack: Key Vault, control-plane identity, resource group, AKS subnet, and ACR
 #   - management stack: log_analytics_workspace_id
 # Provider alias "azurerm.workload" is injected by terragrunt via provider_generated.tf.
 
@@ -37,6 +37,8 @@ module "aks" {
   environment         = var.environment
   location            = var.location
   resource_group_name = var.resource_group_name
+  identity_id         = var.managed_identity_id
+  outbound_type       = var.outbound_type
 
   log_analytics_workspace_id = var.log_analytics_workspace_id
 
@@ -46,6 +48,41 @@ module "aks" {
   subnet_id = var.aks_subnet_id
 
   tags = local.mandatory_tags
+
+  depends_on = [
+    azurerm_role_assignment.aks_subnet_network_contributor,
+    azurerm_role_assignment.aks_route_table_network_contributor,
+  ]
+}
+
+# The user-assigned control-plane identity must be able to manage networking
+# in the pre-created AKS subnet before the cluster is provisioned.
+resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
+  provider                         = azurerm.workload
+  scope                            = var.aks_subnet_id
+  role_definition_name             = "Network Contributor"
+  principal_id                     = var.managed_identity_principal_id
+  skip_service_principal_aad_check = true
+}
+
+# AKS must be able to maintain its custom route table when UDR is enabled.
+resource "azurerm_role_assignment" "aks_route_table_network_contributor" {
+  count = var.aks_route_table_id == null ? 0 : 1
+
+  provider                         = azurerm.workload
+  scope                            = var.aks_route_table_id
+  role_definition_name             = "Network Contributor"
+  principal_id                     = var.managed_identity_principal_id
+  skip_service_principal_aad_check = true
+}
+
+# Nodes pull workload images from the baseline Azure Container Registry.
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  provider                         = azurerm.workload
+  scope                            = var.container_registry_id
+  role_definition_name             = "AcrPull"
+  principal_id                     = module.aks.kubelet_identity_object_id
+  skip_service_principal_aad_check = true
 }
 
 # R8: Diagnostic Settings — AKS cluster logs to central Log Analytics workspace

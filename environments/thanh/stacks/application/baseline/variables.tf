@@ -102,13 +102,6 @@ variable "log_analytics_workspace_id" {
   default     = ""
 }
 
-variable "log_analytics_workspace_key" {
-  description = "Primary shared key of the central Log Analytics workspace (output from platform/management stack). Sensitive — never log or display this value."
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
 # =============================================================================
 # Tags
 # =============================================================================

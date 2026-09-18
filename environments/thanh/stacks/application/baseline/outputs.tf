@@ -31,6 +31,11 @@ output "aks_subnet_id" {
   value       = module.vnet.subnet_ids["aks"]
 }
 
+output "aks_route_table_id" {
+  description = "Resource ID of the route table associated with the AKS subnet when forced tunneling is enabled."
+  value       = try(module.forced_tunneling_rt[0].route_table_id, null)
+}
+
 output "data_subnet_id" {
   description = "Resource ID of the delegated data subnet used by PostgreSQL Flexible Server."
   value       = module.vnet.subnet_ids["data"]
@@ -48,6 +53,11 @@ output "key_vault_id" {
 output "managed_identity_id" {
   description = "Resource ID of the user-assigned Managed Identity deployed in the baseline stack."
   value       = module.managed_identity.id
+}
+
+output "managed_identity_principal_id" {
+  description = "Principal ID of the user-assigned Managed Identity used by AKS for subnet access."
+  value       = module.managed_identity.principal_id
 }
 
 output "container_registry_id" {

@@ -1,6 +1,6 @@
 # infra/stacks/platform/connectivity/terragrunt.hcl
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Download the repository root so Terraform's local ../../.. module paths stay valid in Terragrunt's cache.
@@ -41,8 +41,15 @@ inputs = {
   hub_address_space           = local.env_vars.locals.hub_address_space
   hub_subnets                 = local.env_vars.locals.hub_subnets
   aks_subnet_address_prefixes = local.env_vars.locals.app_subnets.aks.address_prefixes
-  deploy_firewall             = local.env_vars.locals.deploy_firewall
-  deploy_vpn_gateway          = local.env_vars.locals.deploy_vpn_gateway
-  deploy_dns_resolver         = local.env_vars.locals.deploy_dns_resolver
-  tags                        = merge(local.env_vars.locals.common_tags, { Layer = "connectivity" })
+  aks_additional_fqdns = [
+    "*.vault.azure.net",
+    "*.ods.opinsights.azure.com",
+    "*.oms.opinsights.azure.com",
+    "${local.env_vars.locals.name_prefix}${local.env_vars.locals.environment}acr.azurecr.io",
+    "${local.env_vars.locals.name_prefix}${local.env_vars.locals.environment}st.blob.core.windows.net",
+  ]
+  deploy_firewall     = local.env_vars.locals.deploy_firewall
+  deploy_vpn_gateway  = local.env_vars.locals.deploy_vpn_gateway
+  deploy_dns_resolver = local.env_vars.locals.deploy_dns_resolver
+  tags                = merge(local.env_vars.locals.common_tags, { Layer = "connectivity" })
 }

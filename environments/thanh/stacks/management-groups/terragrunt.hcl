@@ -1,6 +1,6 @@
 # infra/stacks/management-groups/terragrunt.hcl
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Download the repository root so Terraform's local ../../.. module paths stay valid in Terragrunt's cache.

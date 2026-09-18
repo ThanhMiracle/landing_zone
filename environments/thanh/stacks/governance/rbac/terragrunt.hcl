@@ -4,7 +4,7 @@
 # Kiểm soát bởi deploy_rbac flag và rbac_assignments map trong env.hcl.
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Download the repository root so Terraform's local ../../.. module paths stay valid in Terragrunt's cache.

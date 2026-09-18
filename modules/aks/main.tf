@@ -40,7 +40,13 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = var.identity_id == null ? "SystemAssigned" : "UserAssigned"
+    identity_ids = var.identity_id == null ? null : [var.identity_id]
+  }
+
+  network_profile {
+    network_plugin = "azure"
+    outbound_type  = var.outbound_type
   }
 
   dynamic "azure_active_directory_role_based_access_control" {
