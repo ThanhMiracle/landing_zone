@@ -40,3 +40,13 @@ output "aks_cluster_name" {
   description = "Name of the AKS cluster. Used by downstream stacks for cluster configuration."
   value       = azurerm_kubernetes_cluster.this.name
 }
+
+output "key_vault_secrets_provider_client_id" {
+  description = "Client ID of the managed identity created for the AKS Key Vault Secrets Store CSI add-on."
+  value       = azurerm_kubernetes_cluster.this.key_vault_secrets_provider[0].secret_identity[0].client_id
+}
+
+output "key_vault_secrets_provider_object_id" {
+  description = "Object ID of the managed identity created for the AKS Key Vault Secrets Store CSI add-on."
+  value       = azurerm_kubernetes_cluster.this.key_vault_secrets_provider[0].secret_identity[0].object_id
+}

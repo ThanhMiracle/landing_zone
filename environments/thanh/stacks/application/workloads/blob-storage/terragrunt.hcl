@@ -25,13 +25,18 @@ dependency "baseline" {
   mock_outputs = {
     spoke_resource_group_name = local.mock_spoke_rg
   }
+
   mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
-# Ensure Terragrunt deploys or refreshes AKS first. The Terraform stack reads
-# the cluster directly instead of relying on an output absent from older state.
-dependencies {
-  paths = ["../aks"]
+dependency "aks" {
+  config_path = "../aks"
+
+  mock_outputs = {
+    aks_kubelet_identity_object_id = "00000000-0000-0000-0000-000000000000"
+  }
+
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
 dependency "management" {
@@ -40,13 +45,15 @@ dependency "management" {
   mock_outputs = {
     log_analytics_workspace_id = "/subscriptions/${local.management_subscription_id}/resourceGroups/mock-management-rg/providers/Microsoft.OperationalInsights/workspaces/mock-law"
   }
+
   mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
 generate "provider" {
   path      = "provider_generated.tf"
   if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
+
+  contents = <<EOF
 provider "azurerm" {
   alias           = "workload"
   subscription_id = "${local.app_subscription_id}"
@@ -56,12 +63,14 @@ EOF
 }
 
 inputs = {
-  subscription_id            = local.app_subscription_id
-  name_prefix                = local.env_vars.locals.name_prefix
-  environment                = local.env_vars.locals.environment
-  location                   = local.env_vars.locals.location
-  resource_group_name        = dependency.baseline.outputs.spoke_resource_group_name
-  aks_cluster_name           = "${local.env_vars.locals.name_prefix}-${local.env_vars.locals.environment}-aks"
-  log_analytics_workspace_id = dependency.management.outputs.log_analytics_workspace_id
-  tags                       = local.env_vars.locals.common_tags
+  subscription_id = local.app_subscription_id
+  name_prefix     = local.env_vars.locals.name_prefix
+  environment     = local.env_vars.locals.environment
+  location        = local.env_vars.locals.location
+
+  resource_group_name            = dependency.baseline.outputs.spoke_resource_group_name
+  aks_kubelet_identity_object_id = dependency.aks.outputs.aks_kubelet_identity_object_id
+  log_analytics_workspace_id     = dependency.management.outputs.log_analytics_workspace_id
+
+  tags = local.env_vars.locals.common_tags
 }

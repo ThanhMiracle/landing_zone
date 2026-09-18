@@ -38,6 +38,18 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
 }
 
 # ---------------------------------------------------------------------------
+# Store the private PostgreSQL connection URL in Key Vault. URL encoding keeps
+# password characters valid inside the URI.
+resource "azurerm_key_vault_secret" "postgresql_connection_url" {
+  provider     = azurerm.workload
+  name         = "postgresql-connection-url"
+  value        = "postgresql://psqladmin:${urlencode(var.postgresql_admin_password)}@${module.postgresql.server_fqdn}:5432/postgres?sslmode=require"
+  key_vault_id = var.key_vault_id
+  content_type = "application/vnd.postgresql.connection-string"
+
+  depends_on = [module.postgresql]
+}
+
 # PostgreSQL Flexible Server
 # ---------------------------------------------------------------------------
 

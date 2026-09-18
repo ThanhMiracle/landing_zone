@@ -36,7 +36,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     max_count            = var.system_node_pool.enable_auto_scaling ? var.system_node_pool.max_count : null
     auto_scaling_enabled = var.system_node_pool.enable_auto_scaling
     # R6: VNet integration — khi subnet_id = null AKS dùng default VNet (backward compatible)
-    vnet_subnet_id       = var.subnet_id
+    vnet_subnet_id = var.subnet_id
   }
 
   identity {
@@ -55,6 +55,12 @@ resource "azurerm_kubernetes_cluster" "this" {
     content {
       log_analytics_workspace_id = var.log_analytics_workspace_id
     }
+  }
+
+  # AKS creates a user-assigned identity for this add-on. The workload stack
+  # grants that identity read-only access to the application Key Vault.
+  key_vault_secrets_provider {
+    secret_rotation_enabled = true
   }
 
   tags = local.common_tags

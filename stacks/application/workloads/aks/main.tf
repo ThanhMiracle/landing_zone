@@ -45,14 +45,19 @@ module "aks" {
   # its default managed VNet — backward compatible.
   subnet_id = var.aks_subnet_id
 
-  # TODO: Pass managed_identity_id for workload identity (requires modules/aks to add identity block)
-  # TODO: Pass key_vault_id for CSI secrets driver (requires modules/aks to add key_vault_secrets_provider add-on)
-  # Track: https://github.com/your-org/infra/issues/XX
-
   tags = local.mandatory_tags
 }
 
-# R8: Diagnostic Settings — AKS cluster logs to central Log Analytics workspace
+# The AKS Key Vault Secrets Store CSI add-on creates its own managed identity.
+# Applications use CSI volumes; this identity has secret-read access only.
+resource "azurerm_role_assignment" "key_vault_secrets_provider" {
+  provider             = azurerm.workload
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = module.aks.key_vault_secrets_provider_object_id
+}
+
+# AKS diagnostics send control-plane logs and metrics to the central workspace.
 module "aks_diagnostics" {
   source = "../../../../modules/diagnostic-settings"
   count  = var.log_analytics_workspace_id != null && var.log_analytics_workspace_id != "" ? 1 : 0

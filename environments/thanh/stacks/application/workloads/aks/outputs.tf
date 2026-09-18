@@ -15,3 +15,13 @@ output "aks_node_resource_group" {
   description = "Name of the auto-generated node resource group created by AKS to hold cluster infrastructure resources (VMs, disks, NICs). Follows Azure default pattern: MC_{resource_group}_{cluster_name}_{location}."
   value       = "MC_${var.resource_group_name}_${var.name_prefix}-${var.environment}-aks_${var.location}"
 }
+
+output "aks_kubelet_identity_object_id" {
+  description = "Object ID of the AKS kubelet managed identity. Downstream stacks use it for Azure data-plane role assignments."
+  value       = module.aks.kubelet_identity_object_id
+}
+
+output "key_vault_secrets_provider_client_id" {
+  description = "Client ID for the AKS Key Vault Secrets Store CSI add-on identity. Use this in a SecretProviderClass."
+  value       = module.aks.key_vault_secrets_provider_client_id
+}

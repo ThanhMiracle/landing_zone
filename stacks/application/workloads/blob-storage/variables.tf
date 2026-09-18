@@ -23,8 +23,8 @@ variable "resource_group_name" {
   type        = string
 }
 
-variable "aks_cluster_name" {
-  description = "Name of the deployed AKS cluster whose kubelet identity receives Blob Data Contributor."
+variable "aks_kubelet_identity_object_id" {
+  description = "Object ID of the deployed AKS kubelet managed identity that receives Blob Data Contributor."
   type        = string
 }
 

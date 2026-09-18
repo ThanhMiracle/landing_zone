@@ -36,21 +36,13 @@ module "blob_storage" {
   tags = local.mandatory_tags
 }
 
-# Read the already-deployed AKS cluster so this stack also works with AKS state
-# files created before the kubelet identity was exposed as a Terragrunt output.
-data "azurerm_kubernetes_cluster" "aks" {
-  provider            = azurerm.workload
-  name                = var.aks_cluster_name
-  resource_group_name = var.resource_group_name
-}
-
 # Blob CSI mounts and other node-identity based access from AKS use this
 # data-plane role. No storage account key is exposed to the cluster.
 resource "azurerm_role_assignment" "aks_blob_data_contributor" {
   provider             = azurerm.workload
   scope                = module.blob_storage.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = data.azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  principal_id         = var.aks_kubelet_identity_object_id
 }
 
 # Storage logs are configured on the Blob service child resource rather than

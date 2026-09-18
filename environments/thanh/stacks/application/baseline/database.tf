@@ -33,6 +33,14 @@ module "key_vault" {
   })
 }
 
+# Terraform writes application connection secrets to this RBAC-enabled vault.
+resource "azurerm_role_assignment" "terraform_key_vault_secrets_officer" {
+  provider             = azurerm.workload
+  scope                = module.key_vault.key_vault_id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Workspace-based Application Insights shares the central Log Analytics
 # workspace from the management stack.
 module "application_insights" {
