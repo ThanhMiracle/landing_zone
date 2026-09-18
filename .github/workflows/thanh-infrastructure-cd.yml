@@ -1,6 +1,15 @@
 name: Thanh Infrastructure CD
 
 on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/actions/setup-iac/**"
+      - ".github/workflows/thanh-infrastructure-*.yml"
+      - "environments/thanh/**"
+      - "modules/**"
+      - "stacks/**"
   workflow_dispatch:
     inputs:
       operation:
@@ -18,11 +27,14 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: thanh-infrastructure-deployment
   cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -32,12 +44,15 @@ env:
   TERRAGRUNT_VERSION: "1.1.1"
 
 jobs:
-  deploy:
-    name: ${{ inputs.operation == 'apply' && 'Apply Thanh' || 'Plan Thanh' }}
+  plan:
+    name: Plan Thanh
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 120
     environment:
-      name: thanh
+      name: thanh-plan
+    permissions:
+      contents: read
+      id-token: write
 
     env:
       ARM_USE_OIDC: "true"
@@ -47,24 +62,22 @@ jobs:
       TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
 
     steps:
-      - name: Check apply confirmation
-        shell: bash
+      - name: Validate deployment request
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
         env:
-          OPERATION: ${{ inputs.operation }}
           CONFIRM_APPLY: ${{ inputs.confirm_apply }}
         run: |
           set -euo pipefail
-          if [[ "${OPERATION}" == "apply" && "${CONFIRM_APPLY}" != "apply-thanh" ]]; then
-            echo "Apply refused: confirm_apply must exactly equal apply-thanh." >&2
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Apply refused: Thanh deployments must run from master." >&2
             exit 1
           fi
-          if [[ "${OPERATION}" == "apply" && "${GITHUB_REF}" != "refs/heads/master" ]]; then
-            echo "Apply refused: Thanh deployments must run from the master branch." >&2
+          if [[ "${CONFIRM_APPLY}" != "apply-thanh" ]]; then
+            echo "Apply refused: confirm_apply must exactly equal apply-thanh." >&2
             exit 1
           fi
 
       - name: Check required environment secrets
-        shell: bash
         run: |
           set -euo pipefail
           for variable_name in \
@@ -73,49 +86,32 @@ jobs:
             ARM_SUBSCRIPTION_ID \
             TF_VAR_postgresql_admin_password; do
             if [[ -z "${!variable_name:-}" ]]; then
-              echo "Missing GitHub environment secret for ${variable_name}." >&2
+              echo "Missing thanh-plan environment secret for ${variable_name}." >&2
               exit 1
             fi
           done
 
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
-
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
+          persist-credentials: false
 
-      - name: Install Terragrunt
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}"
-          install_dir="$(mktemp -d)"
-          curl --fail --silent --show-error --location \
-            --output "${install_dir}/terragrunt_linux_amd64" \
-            "${release_url}/terragrunt_linux_amd64"
-          curl --fail --silent --show-error --location \
-            --output "${install_dir}/SHA256SUMS" \
-            "${release_url}/SHA256SUMS"
-          (
-            cd "${install_dir}"
-            grep ' terragrunt_linux_amd64$' SHA256SUMS | sha256sum --check --strict
-          )
-          sudo install -m 0755 "${install_dir}/terragrunt_linux_amd64" /usr/local/bin/terragrunt
-          rm -rf "${install_dir}"
+      - name: Install IaC tools
+        uses: ./.github/actions/setup-iac
+        with:
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
 
       - name: Sign in to Azure with OIDC
-        uses: azure/login@v3.1.0
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Show execution context
-        shell: bash
         run: |
+          set -euo pipefail
           terraform version
           terragrunt --version
           az account show \
@@ -125,51 +121,172 @@ jobs:
       - name: Plan Thanh infrastructure
         working-directory: environments/thanh
         run: |
-          terragrunt run --source-update --all -- plan \
-            -input=false \
-            -lock-timeout=5m \
-            -no-color
-
-      - name: Apply Thanh infrastructure
-        if: inputs.operation == 'apply'
-        working-directory: environments/thanh
-        run: |
-          terragrunt run --source-update --all -- apply \
-            -auto-approve \
-            -input=false \
-            -lock-timeout=5m \
-            -no-color
-
-      - name: Verify Thanh deployment
-        if: inputs.operation == 'apply'
-        shell: bash
-        run: |
           set -euo pipefail
-          az group show \
-            --name thanhproject-dev-rg \
-            --query '{name:name,state:properties.provisioningState,location:location}' \
-            --output table
-          az aks show \
-            --resource-group thanhproject-dev-rg \
-            --name thanhproject-dev-aks \
-            --query '{name:name,state:provisioningState,version:kubernetesVersion}' \
-            --output table
-          az postgres flexible-server show \
-            --resource-group thanhproject-dev-rg \
-            --name thanhproject-dev-psql-psql \
-            --query '{name:name,state:state,fqdn:fullyQualifiedDomainName}' \
-            --output table
+          evidence_dir="${RUNNER_TEMP}/thanh-plan"
+          mkdir -p "${evidence_dir}"
+          terragrunt run \
+            --source-update \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- plan \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color 2>&1 | tee "${evidence_dir}/plan.txt"
 
-      - name: Write workflow summary
+      - name: Upload plan evidence
         if: always()
-        shell: bash
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thanh-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/thanh-plan/plan.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write plan summary
+        if: always()
         env:
-          OPERATION: ${{ inputs.operation }}
+          REQUESTED_OPERATION: ${{ inputs.operation || 'plan' }}
         run: |
           {
-            echo "## Thanh infrastructure ${OPERATION}"
+            echo "## Thanh infrastructure plan"
             echo
             echo "- Ref: \`${GITHUB_REF}\`"
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Environment: \`environments/thanh\`"
+            echo "- Requested operation: \`${REQUESTED_OPERATION}\`"
+            echo "- Scope: \`environments/thanh\`"
+            echo "- Evidence retention: 14 days"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  apply:
+    name: Apply Thanh
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
+    needs:
+      - plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    environment:
+      name: thanh
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Authorize deployment
+        env:
+          CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Apply refused: Thanh deployments must run from master." >&2
+            exit 1
+          fi
+          if [[ "${CONFIRM_APPLY}" != "apply-thanh" ]]; then
+            echo "Apply refused: confirm_apply must exactly equal apply-thanh." >&2
+            exit 1
+          fi
+
+      - name: Check required environment secrets
+        run: |
+          set -euo pipefail
+          for variable_name in \
+            ARM_CLIENT_ID \
+            ARM_TENANT_ID \
+            ARM_SUBSCRIPTION_ID \
+            TF_VAR_postgresql_admin_password; do
+            if [[ -z "${!variable_name:-}" ]]; then
+              echo "Missing thanh environment secret for ${variable_name}." >&2
+              exit 1
+            fi
+          done
+
+      - name: Check out approved commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install IaC tools
+        uses: ./.github/actions/setup-iac
+        with:
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Re-plan approved commit
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+          terragrunt run \
+            --source-update \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- plan \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color
+
+      - name: Apply approved commit
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+          terragrunt run \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- apply \
+            -auto-approve \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color
+
+      - name: Verify Thanh deployment
+        run: |
+          set -euo pipefail
+          resource_group="thanhproject-dev-rg"
+          az group show \
+            --name "${resource_group}" \
+            --query '{name:name,state:properties.provisioningState,location:location}' \
+            --output table
+          az aks show \
+            --resource-group "${resource_group}" \
+            --name thanhproject-dev-aks \
+            --query '{name:name,state:provisioningState,version:kubernetesVersion}' \
+            --output table
+          az postgres flexible-server list \
+            --resource-group "${resource_group}" \
+            --query '[].{name:name,state:state,fqdn:fullyQualifiedDomainName}' \
+            --output table
+          az resource list \
+            --resource-group "${resource_group}" \
+            --query '[].{name:name,type:type,state:properties.provisioningState}' \
+            --output table
+
+      - name: Write deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Thanh infrastructure apply"
+            echo
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Scope: \`environments/thanh\`"
+            echo "- Protected environment: \`thanh\`"
           } >> "${GITHUB_STEP_SUMMARY}"

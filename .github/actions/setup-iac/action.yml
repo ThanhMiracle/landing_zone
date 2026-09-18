@@ -1,0 +1,47 @@
+name: Set up Terraform and Terragrunt
+description: Install the pinned IaC tools used by the Thanh workflows
+
+inputs:
+  terraform-version:
+    description: Terraform version to install
+    required: true
+  terragrunt-version:
+    description: Terragrunt version to install
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Install Terragrunt
+      shell: bash
+      env:
+        TERRAGRUNT_VERSION: ${{ inputs.terragrunt-version }}
+      run: |
+        set -euo pipefail
+        release_url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}"
+        install_dir="$(mktemp -d)"
+        bin_dir="${RUNNER_TEMP}/iac-bin"
+        mkdir -p "${bin_dir}"
+
+        curl --fail --silent --show-error --location \
+          --retry 3 \
+          --output "${install_dir}/terragrunt_linux_amd64" \
+          "${release_url}/terragrunt_linux_amd64"
+        curl --fail --silent --show-error --location \
+          --retry 3 \
+          --output "${install_dir}/SHA256SUMS" \
+          "${release_url}/SHA256SUMS"
+        (
+          cd "${install_dir}"
+          grep ' terragrunt_linux_amd64$' SHA256SUMS | sha256sum --check --strict
+        )
+
+        install -m 0755 "${install_dir}/terragrunt_linux_amd64" "${bin_dir}/terragrunt"
+        echo "${bin_dir}" >> "${GITHUB_PATH}"
+        rm -rf "${install_dir}"

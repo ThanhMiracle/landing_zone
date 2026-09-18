@@ -4,19 +4,17 @@ on:
   pull_request:
     branches:
       - master
-    paths:
+    paths: &thanh_paths
+      - ".github/actions/setup-iac/**"
       - ".github/workflows/thanh-infrastructure-*.yml"
+      - ".github/dependabot.yml"
       - "environments/thanh/**"
       - "modules/**"
       - "stacks/**"
   push:
     branches:
       - master
-    paths:
-      - ".github/workflows/thanh-infrastructure-*.yml"
-      - "environments/thanh/**"
-      - "modules/**"
-      - "stacks/**"
+    paths: *thanh_paths
   workflow_dispatch:
 
 permissions:
@@ -25,6 +23,10 @@ permissions:
 concurrency:
   group: thanh-infrastructure-ci-${{ github.ref }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -42,32 +44,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
-
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
+          persist-credentials: false
 
-      - name: Install Terragrunt
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}"
-          install_dir="$(mktemp -d)"
-          curl --fail --silent --show-error --location \
-            --output "${install_dir}/terragrunt_linux_amd64" \
-            "${release_url}/terragrunt_linux_amd64"
-          curl --fail --silent --show-error --location \
-            --output "${install_dir}/SHA256SUMS" \
-            "${release_url}/SHA256SUMS"
-          (
-            cd "${install_dir}"
-            grep ' terragrunt_linux_amd64$' SHA256SUMS | sha256sum --check --strict
-          )
-          sudo install -m 0755 "${install_dir}/terragrunt_linux_amd64" /usr/local/bin/terragrunt
-          rm -rf "${install_dir}"
+      - name: Install IaC tools
+        uses: ./.github/actions/setup-iac
+        with:
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
 
       - name: Show tool versions
         run: |
@@ -86,4 +71,11 @@ jobs:
 
       - name: Validate enabled Thanh stacks
         working-directory: environments/thanh
-        run: terragrunt run --source-update --all -- validate -no-color
+        run: |
+          terragrunt run \
+            --source-update \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- validate -no-color
