@@ -35,7 +35,7 @@ remote_state {
   }
   config = local.use_local_backend ? {
     path = "${get_original_terragrunt_dir()}/terraform.tfstate"
-  } : {
+    } : {
     resource_group_name  = "rg-tfstate"
     storage_account_name = get_env("TF_VAR_tfstate_storage_account", "thanhdepzaivl2001")
     container_name       = "tfstate"

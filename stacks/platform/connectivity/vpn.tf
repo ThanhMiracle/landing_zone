@@ -18,7 +18,7 @@ module "vpn_gateway" {
   location            = var.location
   resource_group_name = module.resource_group.name
   gateway_subnet_id   = module.hub_vnet.subnet_ids["GatewaySubnet"]
-  tags                = merge(var.tags, {
+  tags = merge(var.tags, {
     Project     = var.name_prefix
     Environment = var.environment
     ManagedBy   = "terraform"

@@ -34,15 +34,15 @@ EOF
 }
 
 inputs = {
-  subscription_id     = local.env_vars.locals.connectivity_subscription_id
-  name_prefix         = local.env_vars.locals.name_prefix
-  environment         = "connectivity"
-  location            = local.env_vars.locals.location
-  hub_address_space   = local.env_vars.locals.hub_address_space
-  hub_subnets         = local.env_vars.locals.hub_subnets
+  subscription_id             = local.env_vars.locals.connectivity_subscription_id
+  name_prefix                 = local.env_vars.locals.name_prefix
+  environment                 = "connectivity"
+  location                    = local.env_vars.locals.location
+  hub_address_space           = local.env_vars.locals.hub_address_space
+  hub_subnets                 = local.env_vars.locals.hub_subnets
   aks_subnet_address_prefixes = local.env_vars.locals.app_subnets.aks.address_prefixes
-  deploy_firewall     = local.env_vars.locals.deploy_firewall
-  deploy_vpn_gateway  = local.env_vars.locals.deploy_vpn_gateway
-  deploy_dns_resolver = local.env_vars.locals.deploy_dns_resolver
-  tags                = merge(local.env_vars.locals.common_tags, { Layer = "connectivity" })
+  deploy_firewall             = local.env_vars.locals.deploy_firewall
+  deploy_vpn_gateway          = local.env_vars.locals.deploy_vpn_gateway
+  deploy_dns_resolver         = local.env_vars.locals.deploy_dns_resolver
+  tags                        = merge(local.env_vars.locals.common_tags, { Layer = "connectivity" })
 }

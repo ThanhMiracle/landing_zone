@@ -14,7 +14,7 @@ module "resource_group" {
   name_prefix = var.name_prefix
   environment = var.environment
   location    = var.location
-  tags        = merge(var.tags, {
+  tags = merge(var.tags, {
     Project     = var.name_prefix
     Environment = var.environment
     ManagedBy   = "terraform"

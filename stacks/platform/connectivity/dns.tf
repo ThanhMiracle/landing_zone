@@ -19,7 +19,7 @@ module "dns_resolver" {
   resource_group_name = module.resource_group.name
   vnet_id             = module.hub_vnet.vnet_id
   inbound_subnet_id   = module.hub_vnet.subnet_ids["DnsResolverInboundSubnet"]
-  tags                = merge(var.tags, {
+  tags = merge(var.tags, {
     Project     = var.name_prefix
     Environment = var.environment
     ManagedBy   = "terraform"

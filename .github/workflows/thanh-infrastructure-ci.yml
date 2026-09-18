@@ -1,0 +1,89 @@
+name: Thanh Infrastructure CI
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/thanh-infrastructure-*.yml"
+      - "environments/thanh/**"
+      - "modules/**"
+      - "stacks/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/thanh-infrastructure-*.yml"
+      - "environments/thanh/**"
+      - "modules/**"
+      - "stacks/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thanh-infrastructure-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TG_NON_INTERACTIVE: "true"
+  TERRAGRUNT_USE_LOCAL_BACKEND: "true"
+  TERRAFORM_VERSION: "1.14.4"
+  TERRAGRUNT_VERSION: "1.1.1"
+
+jobs:
+  validate:
+    name: Format and validate Thanh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Install Terragrunt
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}"
+          install_dir="$(mktemp -d)"
+          curl --fail --silent --show-error --location \
+            --output "${install_dir}/terragrunt_linux_amd64" \
+            "${release_url}/terragrunt_linux_amd64"
+          curl --fail --silent --show-error --location \
+            --output "${install_dir}/SHA256SUMS" \
+            "${release_url}/SHA256SUMS"
+          (
+            cd "${install_dir}"
+            grep ' terragrunt_linux_amd64$' SHA256SUMS | sha256sum --check --strict
+          )
+          sudo install -m 0755 "${install_dir}/terragrunt_linux_amd64" /usr/local/bin/terragrunt
+          rm -rf "${install_dir}"
+
+      - name: Show tool versions
+        run: |
+          terraform version
+          terragrunt --version
+
+      - name: Check Terraform formatting
+        run: |
+          terraform fmt -check -diff -recursive modules
+          terraform fmt -check -diff -recursive stacks
+          terraform fmt -check -diff -recursive environments/thanh
+
+      - name: Check Thanh Terragrunt formatting
+        working-directory: environments/thanh
+        run: terragrunt hcl fmt --check --diff
+
+      - name: Validate enabled Thanh stacks
+        working-directory: environments/thanh
+        run: terragrunt run --source-update --all -- validate -no-color

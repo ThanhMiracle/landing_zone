@@ -16,7 +16,7 @@ module "hub_vnet" {
   resource_group_name = module.resource_group.name
   address_space       = var.hub_address_space
   subnets             = var.hub_subnets
-  tags                = merge(var.tags, {
+  tags = merge(var.tags, {
     Project     = var.name_prefix
     Environment = var.environment
     ManagedBy   = "terraform"

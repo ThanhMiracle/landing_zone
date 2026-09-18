@@ -22,10 +22,10 @@ output "primary_key" {
 output "connection_strings" {
   description = "Map of SQL connection strings for the Cosmos DB account (primary, primary_readonly, secondary, secondary_readonly)."
   value = {
-    primary              = azurerm_cosmosdb_account.this.primary_sql_connection_string
-    primary_readonly     = azurerm_cosmosdb_account.this.primary_readonly_sql_connection_string
-    secondary            = azurerm_cosmosdb_account.this.secondary_sql_connection_string
-    secondary_readonly   = azurerm_cosmosdb_account.this.secondary_readonly_sql_connection_string
+    primary            = azurerm_cosmosdb_account.this.primary_sql_connection_string
+    primary_readonly   = azurerm_cosmosdb_account.this.primary_readonly_sql_connection_string
+    secondary          = azurerm_cosmosdb_account.this.secondary_sql_connection_string
+    secondary_readonly = azurerm_cosmosdb_account.this.secondary_readonly_sql_connection_string
   }
   sensitive = true
 }
