@@ -39,6 +39,8 @@ module "aks" {
   resource_group_name = var.resource_group_name
   identity_id         = var.managed_identity_id
   outbound_type       = var.outbound_type
+  service_cidr        = var.service_cidr
+  dns_service_ip      = var.dns_service_ip
 
   log_analytics_workspace_id = var.log_analytics_workspace_id
 

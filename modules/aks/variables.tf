@@ -54,6 +54,18 @@ variable "outbound_type" {
   }
 }
 
+variable "service_cidr" {
+  description = "Optional Kubernetes service CIDR. Must not overlap connected networks; set together with dns_service_ip."
+  type        = string
+  default     = null
+}
+
+variable "dns_service_ip" {
+  description = "Optional Kubernetes DNS service IP within service_cidr. Leave both null to use Azure defaults."
+  type        = string
+  default     = null
+}
+
 variable "enable_azure_ad_rbac" {
   description = "Whether to enable Azure AD-integrated RBAC for the cluster"
   type        = bool

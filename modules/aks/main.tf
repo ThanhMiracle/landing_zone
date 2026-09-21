@@ -47,6 +47,8 @@ resource "azurerm_kubernetes_cluster" "this" {
   network_profile {
     network_plugin = "azure"
     outbound_type  = var.outbound_type
+    service_cidr   = var.service_cidr
+    dns_service_ip = var.dns_service_ip
   }
 
   dynamic "azure_active_directory_role_based_access_control" {

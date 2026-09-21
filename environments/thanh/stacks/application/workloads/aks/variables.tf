@@ -61,6 +61,18 @@ variable "resource_group_name" {
   type        = string
 }
 
+variable "service_cidr" {
+  description = "Kubernetes service CIDR, separate from the hub and spoke address spaces."
+  type        = string
+  nullable    = false
+}
+
+variable "dns_service_ip" {
+  description = "Kubernetes DNS service IP within the service CIDR."
+  type        = string
+  nullable    = false
+}
+
 variable "log_analytics_workspace_id" {
   description = "Resource ID of the Log Analytics workspace from the management stack. Used for OMS agent monitoring add-on."
   type        = string

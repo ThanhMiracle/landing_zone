@@ -90,6 +90,8 @@ inputs = {
   aks_route_table_id            = dependency.baseline.outputs.aks_route_table_id
   container_registry_id         = dependency.baseline.outputs.container_registry_id
   outbound_type                 = local.aks_outbound_type
+  service_cidr                  = local.env_vars.locals.aks_service_cidr
+  dns_service_ip                = local.env_vars.locals.aks_dns_service_ip
 
   log_analytics_workspace_id = dependency.management.outputs.log_analytics_workspace_id
 

@@ -55,6 +55,10 @@ locals {
   hub_address_space      = ["10.0.0.0/16"] # Hub VNet (Connectivity stack)
   app_vnet_address_space = ["10.1.0.0/16"] # Spoke VNet (Baseline stack)
 
+  # Kubernetes service addresses must not overlap the hub or spoke networks.
+  aks_service_cidr   = "172.20.0.0/16"
+  aks_dns_service_ip = "172.20.0.10"
+
   # ── Hub Subnets (cho Connectivity stack) ──────────────────────────────────
   # AzureFirewallSubnet: /26 minimum
   # GatewaySubnet: /27 minimum
@@ -70,6 +74,8 @@ locals {
     default = { address_prefixes = ["10.1.1.0/24"] }
     data = {
       address_prefixes = ["10.1.2.0/24"]
+      # Preserve the endpoint PostgreSQL needs for Storage/WAL traffic.
+      service_endpoints = ["Microsoft.Storage"]
       delegation = {
         name = "postgresql"
         service_delegation = {
