@@ -60,15 +60,18 @@ module "postgresql" {
     azurerm = azurerm.workload
   }
 
-  # Naming: <name_prefix>-<environment>-psql
+  # The module appends -psql itself; passing the plain environment prevents
+  # an accidental duplicate suffix such as ...-dev-psql-psql.
   name_prefix = var.name_prefix
-  environment = "${var.environment}-psql"
+  environment = var.environment
 
   resource_group_name = var.resource_group_name
   location            = var.location
 
   # Compute & storage
-  sku_name           = "B_Standard_B1ms"
+  # Japan West advertises B2s as the default Burstable Flexible Server SKU.
+  # It provides two vCores and avoids retrying the capacity-constrained B1ms.
+  sku_name           = "B_Standard_B2s"
   postgresql_version = "16"
   storage_mb         = 32768
 

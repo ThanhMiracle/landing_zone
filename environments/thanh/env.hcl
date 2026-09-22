@@ -12,6 +12,12 @@ locals {
   environment = "dev"
   location    = "japanwest"
 
+  # The app-shop deployment workflow uses this dedicated user-assigned
+  # identity through OIDC to push images to ACR. The credential accepts only
+  # tokens issued for app-shop's master branch.
+  github_repository   = "Dev-MT10-SI/VNN-Agent-orchestrator"
+  github_oidc_subject = "repo:Dev-MT10-SI/VNN-Agent-orchestrator:ref:refs/heads/master"
+
   # ── Subscription IDs (R10.3) ──────────────────────────────────────────────
   # Điền bằng Azure Subscription ID thực tế hoặc để trống "" cho CI validate.
   # Mỗi platform subscription nên là subscription riêng biệt theo CAF.

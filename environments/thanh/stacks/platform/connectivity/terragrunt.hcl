@@ -47,6 +47,14 @@ inputs = {
     "*.oms.opinsights.azure.com",
     "${local.env_vars.locals.name_prefix}${local.env_vars.locals.environment}acr.azurecr.io",
     "${local.env_vars.locals.name_prefix}${local.env_vars.locals.environment}st.blob.core.windows.net",
+    # Standard ACR redirects image-layer downloads to Azure-managed Blob storage.
+    # ACR's managed storage hostname is not stable, so the documented endpoint
+    # pattern is required while dedicated ACR data endpoints are unavailable.
+    "*.blob.core.windows.net",
+    # Docker Hub image pulls: registry, bearer-token service, and image-layer CDN.
+    "registry-1.docker.io",
+    "auth.docker.io",
+    "production.cloudfront.docker.com",
   ]
   deploy_firewall     = local.env_vars.locals.deploy_firewall
   deploy_vpn_gateway  = local.env_vars.locals.deploy_vpn_gateway

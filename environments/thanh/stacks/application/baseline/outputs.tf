@@ -70,6 +70,21 @@ output "container_registry_login_server" {
   value       = module.container_registry.login_server
 }
 
+output "container_registry_name" {
+  description = "Container Registry name used by CI to request a registry login token."
+  value       = module.container_registry.registry_name
+}
+
+output "github_actions_acr_push_client_id" {
+  description = "Client ID for the GitHub Actions OIDC identity that has AcrPush on the baseline ACR."
+  value       = module.github_actions_acr_push_identity.client_id
+}
+
+output "github_actions_acr_push_principal_id" {
+  description = "Principal ID for the GitHub Actions OIDC identity that has AcrPush on the baseline ACR."
+  value       = module.github_actions_acr_push_identity.principal_id
+}
+
 # -----------------------------------------------------------------------------
 # Observability
 # -----------------------------------------------------------------------------

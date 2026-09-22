@@ -118,6 +118,8 @@ inputs = {
   name_prefix            = local.name_prefix
   environment            = local.environment
   location               = local.env_vars.locals.location
+  github_repository      = local.env_vars.locals.github_repository
+  github_oidc_subject    = local.env_vars.locals.github_oidc_subject
   app_vnet_address_space = local.env_vars.locals.app_vnet_address_space
   app_subnets            = local.env_vars.locals.app_subnets
 

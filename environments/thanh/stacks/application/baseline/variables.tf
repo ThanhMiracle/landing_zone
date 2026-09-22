@@ -25,6 +25,16 @@ variable "location" {
   default     = "southeastasia"
 }
 
+variable "github_repository" {
+  description = "GitHub repository permitted to push images to the baseline ACR through OIDC."
+  type        = string
+}
+
+variable "github_oidc_subject" {
+  description = "Exact GitHub OIDC subject allowed to push images through the federated credential."
+  type        = string
+}
+
 # =============================================================================
 # Networking Variables — from env.hcl
 # =============================================================================

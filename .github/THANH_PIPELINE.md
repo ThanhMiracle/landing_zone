@@ -48,6 +48,25 @@ Audience: api://AzureADTokenExchange
 
 No Azure client secret is required.
 
+## app-shop ACR Image Push with OIDC
+
+Terraform creates a dedicated user-assigned identity for
+`Dev-MT10-SI/app-shop`. Its federated credential accepts only this subject:
+
+```text
+repo:Dev-MT10-SI/app-shop:ref:refs/heads/master
+```
+
+After the baseline stack has been applied, set the `AZURE_CLIENT_ID` repository
+variable in `Dev-MT10-SI/app-shop` to the
+`github_actions_acr_push_client_id` Terraform output. Its existing
+`.github/workflows/deploy-dev.yml` already requests an OIDC token and pushes
+the frontend and API images to ACR. `ACR_NAME`, `AZURE_TENANT_ID`, and
+`AZURE_SUBSCRIPTION_ID` are already repository variables there.
+
+The CI identity has `AcrPush` only at the ACR scope. AKS uses its separate
+kubelet identity with `AcrPull`, and the ACR admin account remains disabled.
+
 ## Run A Plan
 
 1. Open **Actions > Thanh Infrastructure CD > Run workflow**.
