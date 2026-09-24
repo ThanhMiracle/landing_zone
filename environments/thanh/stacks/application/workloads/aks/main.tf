@@ -60,22 +60,20 @@ module "aks" {
 # The user-assigned control-plane identity must be able to manage networking
 # in the pre-created AKS subnet before the cluster is provisioned.
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
-  provider                         = azurerm.workload
-  scope                            = var.aks_subnet_id
-  role_definition_name             = "Network Contributor"
-  principal_id                     = var.managed_identity_principal_id
-  skip_service_principal_aad_check = true
+  provider             = azurerm.workload
+  scope                = var.aks_subnet_id
+  role_definition_name = "Network Contributor"
+  principal_id         = var.managed_identity_principal_id
 }
 
 # AKS must be able to maintain its custom route table when UDR is enabled.
 resource "azurerm_role_assignment" "aks_route_table_network_contributor" {
   count = var.aks_route_table_id == null ? 0 : 1
 
-  provider                         = azurerm.workload
-  scope                            = var.aks_route_table_id
-  role_definition_name             = "Network Contributor"
-  principal_id                     = var.managed_identity_principal_id
-  skip_service_principal_aad_check = true
+  provider             = azurerm.workload
+  scope                = var.aks_route_table_id
+  role_definition_name = "Network Contributor"
+  principal_id         = var.managed_identity_principal_id
 }
 
 # Nodes pull workload images from the baseline Azure Container Registry.
@@ -84,6 +82,34 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   scope                            = var.container_registry_id
   role_definition_name             = "AcrPull"
   principal_id                     = module.aks.kubelet_identity_object_id
+  skip_service_principal_aad_check = true
+}
+
+# GitHub Actions uses this separate identity only for deployments. It can get
+# AKS user credentials, while the build identity remains limited to AcrPush.
+resource "azurerm_user_assigned_identity" "github_actions_deploy" {
+  provider            = azurerm.workload
+  name                = "${var.name_prefix}-${var.environment}-github-deploy-id"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = local.mandatory_tags
+}
+
+resource "azurerm_federated_identity_credential" "github_actions_deploy" {
+  provider            = azurerm.workload
+  name                = "github-production"
+  resource_group_name = var.resource_group_name
+  parent_id           = azurerm_user_assigned_identity.github_actions_deploy.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = var.github_deploy_oidc_subject
+}
+
+resource "azurerm_role_assignment" "github_actions_deploy_cluster_user" {
+  provider                         = azurerm.workload
+  scope                            = module.aks.cluster_id
+  role_definition_name             = "Azure Kubernetes Service Cluster User Role"
+  principal_id                     = azurerm_user_assigned_identity.github_actions_deploy.principal_id
   skip_service_principal_aad_check = true
 }
 

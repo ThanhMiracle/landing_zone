@@ -12,11 +12,16 @@ locals {
   environment = "dev"
   location    = "japanwest"
 
-  # The app-shop deployment workflow uses this dedicated user-assigned
-  # identity through OIDC to push images to ACR. The credential accepts only
-  # tokens issued for app-shop's master branch.
-  github_repository   = "Dev-MT10-SI/VNN-Agent-orchestrator"
-  github_oidc_subject = "repo:Dev-MT10-SI/VNN-Agent-orchestrator:ref:refs/heads/master"
+  # The VNN Agent Orchestrator release workflow uses this dedicated
+  # user-assigned identity through OIDC to push images to ACR.
+  github_repository = "Dev-MT10-SI/VNN-Agent-orchestrator"
+  # This repository uses GitHub's customized OIDC `sub` template, which
+  # includes immutable organization and repository IDs. Keep this exact value
+  # synchronized with the subject emitted in its release workflow.
+  github_oidc_subject = "repo:Dev-MT10-SI@330316027/VNN-Agent-orchestrator@1374089373:ref:refs/heads/master"
+  # Deployment uses the protected GitHub Actions `production` environment and
+  # a separate identity with only Kubernetes cluster-user access.
+  github_deploy_oidc_subject = "repo:Dev-MT10-SI@330316027/VNN-Agent-orchestrator@1374089373:environment:production"
 
   # ── Subscription IDs (R10.3) ──────────────────────────────────────────────
   # Điền bằng Azure Subscription ID thực tế hoặc để trống "" cho CI validate.
@@ -64,6 +69,10 @@ locals {
   # Kubernetes service addresses must not overlap the hub or spoke networks.
   aks_service_cidr   = "172.20.0.0/16"
   aks_dns_service_ip = "172.20.0.10"
+
+  # Public IP assigned to the platform/nginx LoadBalancer service. Azure
+  # Firewall exposes it through a DNAT rule on the firewall frontend.
+  aks_ingress_load_balancer_ip = "135.149.158.217"
 
   # ── Hub Subnets (cho Connectivity stack) ──────────────────────────────────
   # AzureFirewallSubnet: /26 minimum

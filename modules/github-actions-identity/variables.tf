@@ -38,8 +38,8 @@ variable "github_oidc_subject" {
   type        = string
 
   validation {
-    condition     = startswith(var.github_oidc_subject, "repo:${var.github_repository}:")
-    error_message = "github_oidc_subject must belong to github_repository."
+    condition     = startswith(var.github_oidc_subject, "repo:")
+    error_message = "github_oidc_subject must be a GitHub Actions OIDC subject beginning with repo:."
   }
 }
 

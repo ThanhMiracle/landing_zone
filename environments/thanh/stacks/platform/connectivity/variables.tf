@@ -66,6 +66,13 @@ variable "aks_additional_fqdns" {
   default     = []
 }
 
+variable "aks_ingress_load_balancer_ip" {
+  description = "Public frontend IP of the AKS LoadBalancer service reached through Azure Firewall DNAT. Null disables public HTTP ingress through the firewall."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 # ---------------------------------------------------------------------------
 # Hub networking
 # ---------------------------------------------------------------------------

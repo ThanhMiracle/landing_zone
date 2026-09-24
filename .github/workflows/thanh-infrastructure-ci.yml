@@ -37,6 +37,45 @@ env:
   TERRAGRUNT_VERSION: "1.1.1"
 
 jobs:
+  security:
+    name: Secret and IaC policy checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan for exposed secrets
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+
+      - name: Create security evidence directory
+        run: mkdir -p "${RUNNER_TEMP}/thanh-security"
+
+      - name: Scan Terraform configuration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          scanners: misconfig,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: json
+          output: ${{ runner.temp }}/thanh-security/trivy-iac.json
+          skip-dirs: .git,.terragrunt-cache
+
+      - name: Upload security evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thanh-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/thanh-security/
+          if-no-files-found: warn
+          retention-days: 30
+
   validate:
     name: Format and validate Thanh
     runs-on: ubuntu-latest
@@ -79,3 +118,87 @@ jobs:
             --provider-cache \
             --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
             -- validate -no-color
+
+  plan:
+    name: Plan Thanh pull request
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    needs:
+      - security
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: thanh-plan
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Check required environment secrets
+        run: |
+          set -euo pipefail
+          for variable_name in \
+            ARM_CLIENT_ID \
+            ARM_TENANT_ID \
+            ARM_SUBSCRIPTION_ID \
+            TF_VAR_postgresql_admin_password; do
+            if [[ -z "${!variable_name:-}" ]]; then
+              echo "Missing thanh-plan environment secret for ${variable_name}." >&2
+              exit 1
+            fi
+          done
+
+      - name: Check out pull request commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Install IaC tools
+        uses: ./.github/actions/setup-iac
+        with:
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create reviewable Terraform plan
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+          evidence_dir="${RUNNER_TEMP}/thanh-pr-plan"
+          mkdir -p "${evidence_dir}"
+          terragrunt run \
+            --source-update \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- plan \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color 2>&1 | tee "${evidence_dir}/plan.txt"
+          sha256sum "${evidence_dir}/plan.txt" | awk '{print $1}' > "${evidence_dir}/plan.sha256"
+
+      - name: Upload pull request plan evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thanh-pr-plan-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/thanh-pr-plan/
+          if-no-files-found: warn
+          retention-days: 30

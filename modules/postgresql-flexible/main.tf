@@ -22,13 +22,13 @@ resource "azurerm_postgresql_flexible_server" "this" {
   backup_retention_days        = var.backup_retention_days
   geo_redundant_backup_enabled = var.geo_redundant_backup_enabled
 
-  # Private access via delegated subnet — no public access by default
   delegated_subnet_id           = var.delegated_subnet_id
   private_dns_zone_id           = var.private_dns_zone_id
   public_network_access_enabled = false
 
   dynamic "high_availability" {
     for_each = var.high_availability_mode != null ? [var.high_availability_mode] : []
+
     content {
       mode = high_availability.value
     }
@@ -36,9 +36,16 @@ resource "azurerm_postgresql_flexible_server" "this" {
 
   dynamic "customer_managed_key" {
     for_each = var.key_vault_key_id != null ? [var.key_vault_key_id] : []
+
     content {
       key_vault_key_id = customer_managed_key.value
     }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      zone
+    ]
   }
 
   tags = merge(
@@ -49,13 +56,4 @@ resource "azurerm_postgresql_flexible_server" "this" {
     },
     var.tags
   )
-}
-
-resource "azurerm_postgresql_flexible_server_database" "this" {
-  for_each = var.databases
-
-  name      = each.key
-  server_id = azurerm_postgresql_flexible_server.this.id
-  charset   = each.value.charset
-  collation = each.value.collation
 }

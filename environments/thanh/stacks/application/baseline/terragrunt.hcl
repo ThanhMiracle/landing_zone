@@ -47,6 +47,7 @@ dependency "connectivity" {
   mock_outputs = {
     hub_vnet_id             = local.mock_hub_vnet_id
     firewall_private_ip     = "10.0.0.4"
+    firewall_public_ip      = "203.0.113.10"
     hub_resource_group_name = local.mock_hub_resource_group_name
     dns_server_ip           = null
   }
@@ -126,6 +127,7 @@ inputs = {
   # Connectivity
   hub_vnet_id             = dependency.connectivity.outputs.hub_vnet_id
   firewall_private_ip     = dependency.connectivity.outputs.firewall_private_ip
+  firewall_public_ip      = dependency.connectivity.outputs.firewall_public_ip
   hub_resource_group_name = dependency.connectivity.outputs.hub_resource_group_name
 
   # DNS Resolver is optional.

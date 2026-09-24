@@ -69,9 +69,9 @@ module "postgresql" {
   location            = var.location
 
   # Compute & storage
-  # Japan West advertises B2s as the default Burstable Flexible Server SKU.
-  # It provides two vCores and avoids retrying the capacity-constrained B1ms.
-  sku_name           = "B_Standard_B2s"
+  # Use the four-vCore Burstable SKU available in Japan West instead of the
+  # previously capacity-constrained B1ms size.
+  sku_name           = "B_Standard_B4ms"
   postgresql_version = "16"
   storage_mb         = 32768
 

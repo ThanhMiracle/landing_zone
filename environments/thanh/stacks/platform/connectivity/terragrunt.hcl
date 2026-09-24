@@ -34,13 +34,14 @@ EOF
 }
 
 inputs = {
-  subscription_id             = local.env_vars.locals.connectivity_subscription_id
-  name_prefix                 = local.env_vars.locals.name_prefix
-  environment                 = "connectivity"
-  location                    = local.env_vars.locals.location
-  hub_address_space           = local.env_vars.locals.hub_address_space
-  hub_subnets                 = local.env_vars.locals.hub_subnets
-  aks_subnet_address_prefixes = local.env_vars.locals.app_subnets.aks.address_prefixes
+  subscription_id              = local.env_vars.locals.connectivity_subscription_id
+  name_prefix                  = local.env_vars.locals.name_prefix
+  environment                  = "connectivity"
+  location                     = local.env_vars.locals.location
+  hub_address_space            = local.env_vars.locals.hub_address_space
+  hub_subnets                  = local.env_vars.locals.hub_subnets
+  aks_subnet_address_prefixes  = local.env_vars.locals.app_subnets.aks.address_prefixes
+  aks_ingress_load_balancer_ip = local.env_vars.locals.aks_ingress_load_balancer_ip
   aks_additional_fqdns = [
     "*.vault.azure.net",
     "*.ods.opinsights.azure.com",

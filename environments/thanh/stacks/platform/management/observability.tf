@@ -17,6 +17,24 @@ module "log_analytics" {
   tags                = local.mandatory_tags
 }
 
+# AKS creates this legacy solution when its oms_agent integration is enabled.
+# Manage it explicitly so Terraform removes it before deleting the Log
+# Analytics resource group during a full environment teardown.
+resource "azurerm_log_analytics_solution" "container_insights" {
+  provider            = azurerm.management
+  solution_name       = "ContainerInsights"
+  location            = var.location
+  resource_group_name = module.resource_group.name
+
+  workspace_resource_id = module.log_analytics.workspace_resource_id
+  workspace_name        = module.log_analytics.workspace_name
+
+  plan {
+    publisher = "Microsoft"
+    product   = "OMSGallery/ContainerInsights"
+  }
+}
+
 module "defender" {
   source = "../../../modules/defender-for-cloud"
   count  = var.deploy_defender ? 1 : 0

@@ -58,6 +58,26 @@ module "firewall" {
       ]
     }
   } : {}
+  # With the AKS subnet forced through this firewall by UDR, public ingress
+  # must enter through the firewall too. Otherwise its return traffic is
+  # asymmetric and Azure Firewall drops it.
+  dnat_rule_collections = var.aks_ingress_load_balancer_ip != null ? {
+    aks_public_http = {
+      priority = 300
+      action   = "Dnat"
+      rules = [
+        {
+          name                = "http-to-aks-nginx-load-balancer"
+          protocols           = ["TCP"]
+          source_addresses    = ["*"]
+          destination_address = null
+          destination_ports   = ["80"]
+          translated_address  = var.aks_ingress_load_balancer_ip
+          translated_port     = "80"
+        },
+      ]
+    }
+  } : {}
   tags = merge(var.tags, {
     Project     = var.name_prefix
     Environment = var.environment

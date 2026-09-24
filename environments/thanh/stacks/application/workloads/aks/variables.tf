@@ -46,6 +46,16 @@ variable "container_registry_id" {
   type        = string
 }
 
+variable "github_deploy_oidc_subject" {
+  description = "Exact GitHub OIDC subject allowed to deploy to this AKS cluster."
+  type        = string
+
+  validation {
+    condition     = startswith(var.github_deploy_oidc_subject, "repo:")
+    error_message = "github_deploy_oidc_subject must be a GitHub Actions OIDC subject beginning with repo:."
+  }
+}
+
 variable "outbound_type" {
   description = "AKS outbound routing mode. Use userDefinedRouting when the spoke subnet routes through Azure Firewall."
   type        = string

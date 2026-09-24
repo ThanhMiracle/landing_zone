@@ -25,3 +25,8 @@ output "key_vault_secrets_provider_client_id" {
   description = "Client ID for the AKS Key Vault Secrets Store CSI add-on identity. Use this in a SecretProviderClass."
   value       = module.aks.key_vault_secrets_provider_client_id
 }
+
+output "github_actions_deploy_client_id" {
+  description = "Client ID for the GitHub Actions OIDC identity authorized to deploy to this AKS cluster."
+  value       = azurerm_user_assigned_identity.github_actions_deploy.client_id
+}

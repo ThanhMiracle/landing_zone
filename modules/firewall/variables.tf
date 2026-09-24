@@ -131,7 +131,7 @@ variable "dnat_rule_collections" {
       name                = string
       protocols           = list(string)
       source_addresses    = list(string)
-      destination_address = string
+      destination_address = optional(string)
       destination_ports   = list(string)
       translated_address  = string
       translated_port     = string

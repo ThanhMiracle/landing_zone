@@ -89,6 +89,13 @@ variable "firewall_private_ip" {
   default     = null
 }
 
+variable "firewall_public_ip" {
+  description = "Azure Firewall public IP. The forced-tunneling route table adds a /32 Internet route for firewall-DNAT return traffic."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
 variable "hub_resource_group_name" {
   description = "Name of the resource group containing the hub VNet (output from platform/connectivity stack). Required for cross-subscription VNet peering."
   type        = string

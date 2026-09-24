@@ -88,7 +88,8 @@ module "hub_peering" {
 # Only deployed when firewall_private_ip is a non-null, non-empty string.
 # ---------------------------------------------------------------------------
 locals {
-  firewall_ip_is_set = var.firewall_private_ip != null && var.firewall_private_ip != ""
+  firewall_ip_is_set        = var.firewall_private_ip != null && var.firewall_private_ip != ""
+  firewall_public_ip_is_set = var.firewall_public_ip != null && var.firewall_public_ip != ""
 }
 
 module "forced_tunneling_rt" {
@@ -106,13 +107,24 @@ module "forced_tunneling_rt" {
     ManagedBy   = "terraform"
   })
 
-  routes = {
-    internet = {
-      address_prefix         = "0.0.0.0/0"
-      next_hop_type          = "VirtualAppliance"
-      next_hop_in_ip_address = var.firewall_private_ip
-    }
-  }
+  routes = merge(
+    {
+      internet = {
+        address_prefix         = "0.0.0.0/0"
+        next_hop_type          = "VirtualAppliance"
+        next_hop_in_ip_address = var.firewall_private_ip
+      }
+    },
+    local.firewall_public_ip_is_set ? {
+      # Ensure replies to Firewall DNAT ingress use the Internet path instead
+      # of the 0.0.0.0/0 forced-tunneling route back to the firewall private IP.
+      firewall_public_ip_return = {
+        address_prefix         = "${var.firewall_public_ip}/32"
+        next_hop_type          = "Internet"
+        next_hop_in_ip_address = null
+      }
+    } : {},
+  )
 
   # Exclude AzureBastionSubnet — Bastion needs direct internet, must not go through firewall
   subnet_ids = { for subnet_name, subnet in var.app_subnets : subnet_name => module.vnet.subnet_ids[subnet_name] if subnet_name != "AzureBastionSubnet" }
