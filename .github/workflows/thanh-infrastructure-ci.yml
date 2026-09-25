@@ -1,28 +1,38 @@
-name: Thanh Infrastructure CI
+name: Thanh Infrastructure CD
 
 on:
-  pull_request:
-    branches:
-      - master
-    paths: &thanh_paths
-      - ".github/actions/setup-iac/**"
-      - ".github/workflows/thanh-infrastructure-*.yml"
-      - ".github/dependabot.yml"
-      - "environments/thanh/**"
-      - "modules/**"
-      - "stacks/**"
   push:
     branches:
       - master
-    paths: *thanh_paths
+    paths:
+      - ".github/actions/setup-iac/**"
+      - ".github/workflows/thanh-infrastructure-*.yml"
+      - "environments/thanh/**"
+      - "modules/**"
+      - "stacks/**"
+
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Select whether to plan or deploy the Thanh environment
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+
+      confirm_apply:
+        description: Type apply-thanh when operation is apply
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: thanh-infrastructure-ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: thanh-infrastructure-deployment
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -32,151 +42,111 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   TG_NON_INTERACTIVE: "true"
-  TERRAGRUNT_USE_LOCAL_BACKEND: "true"
+
   TERRAFORM_VERSION: "1.14.4"
   TERRAGRUNT_VERSION: "1.1.1"
 
+  TFSTATE_STORAGE_ACCOUNT: "thanhdepzaivl2001"
+  TFSTATE_CONTAINER: "tfstate"
+
+
 jobs:
-  security:
-    name: Secret and IaC policy checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Create security evidence directory
-        run: mkdir -p "${RUNNER_TEMP}/thanh-security"
-
-      - name: Scan Terraform configuration
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: config
-          scan-ref: stacks
-          scanners: misconfig
-          severity: HIGH,CRITICAL
-          exit-code: "0"
-          format: json
-          output: ${{ runner.temp }}/thanh-security/trivy-iac.json
-
-      - name: Scan repository for exposed secrets
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: secret
-          severity: HIGH,CRITICAL
-          exit-code: "0"
-          format: json
-          output: ${{ runner.temp }}/thanh-security/trivy-secrets.json
-          skip-dirs: .git,.terragrunt-cache
-
-      - name: Upload security evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: thanh-security-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/thanh-security/
-          if-no-files-found: warn
-          retention-days: 30
-
-  validate:
-    name: Format and validate Thanh
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install IaC tools
-        uses: ./.github/actions/setup-iac
-        with:
-          terraform-version: ${{ env.TERRAFORM_VERSION }}
-          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
-
-      - name: Show tool versions
-        run: |
-          terraform version
-          terragrunt --version
-
-      - name: Check Terraform formatting
-        run: |
-          terraform fmt -check -diff -recursive modules
-          terraform fmt -check -diff -recursive stacks
-          terraform fmt -check -diff -recursive environments/thanh
-
-      - name: Check Thanh Terragrunt formatting
-        working-directory: environments/thanh
-        run: terragrunt hcl fmt --check --diff
-
-      - name: Validate enabled Thanh stacks
-        working-directory: environments/thanh
-        run: |
-          terragrunt run \
-            --source-update \
-            --all \
-            --parallelism 4 \
-            --provider-cache \
-            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
-            -- validate -no-color
-
+  # ============================================================
+  # PLAN
+  # ============================================================
   plan:
-    name: Plan Thanh pull request
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    needs:
-      - security
-      - validate
+    name: Plan Thanh
     runs-on: ubuntu-latest
     timeout-minutes: 120
+
     environment:
       name: thanh-plan
+
     permissions:
       contents: read
       id-token: write
 
     env:
-      ARM_USE_OIDC: "true"
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # Terraform provider v4 requires subscription ID.
+      #
+      # Do NOT set ARM_USE_OIDC here.
+      # azure/login performs OIDC authentication and Terraform/Terragrunt
+      # consumes the authenticated Azure CLI session.
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
 
     steps:
-      - name: Check required environment secrets
+
+      # ----------------------------------------------------------
+      # Validate request
+      # ----------------------------------------------------------
+      - name: Validate deployment request
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
+        env:
+          CONFIRM_APPLY: ${{ inputs.confirm_apply }}
         run: |
           set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Apply refused: Thanh deployments must run from master." >&2
+            exit 1
+          fi
+
+          if [[ "${CONFIRM_APPLY}" != "apply-thanh" ]]; then
+            echo "Apply refused: confirm_apply must exactly equal apply-thanh." >&2
+            exit 1
+          fi
+
+
+      # ----------------------------------------------------------
+      # Validate secrets
+      # ----------------------------------------------------------
+      - name: Check required environment secrets
+        env:
+          AZURE_CLIENT_ID_VALUE: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID_VALUE: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID_VALUE: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          POSTGRESQL_ADMIN_PASSWORD_VALUE: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
           for variable_name in \
-            ARM_CLIENT_ID \
-            ARM_TENANT_ID \
-            ARM_SUBSCRIPTION_ID \
-            TF_VAR_postgresql_admin_password; do
+            AZURE_CLIENT_ID_VALUE \
+            AZURE_TENANT_ID_VALUE \
+            AZURE_SUBSCRIPTION_ID_VALUE \
+            POSTGRESQL_ADMIN_PASSWORD_VALUE
+          do
             if [[ -z "${!variable_name:-}" ]]; then
-              echo "Missing thanh-plan environment secret for ${variable_name}." >&2
+              echo "Missing required thanh-plan environment secret: ${variable_name}" >&2
               exit 1
             fi
           done
 
-      - name: Check out pull request commit
+
+      # ----------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+
+      # ----------------------------------------------------------
+      # Install Terraform / Terragrunt
+      # ----------------------------------------------------------
       - name: Install IaC tools
         uses: ./.github/actions/setup-iac
         with:
           terraform-version: ${{ env.TERRAFORM_VERSION }}
           terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
 
+
+      # ----------------------------------------------------------
+      # Azure login
+      # ----------------------------------------------------------
       - name: Sign in to Azure with OIDC
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
@@ -184,12 +154,52 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create reviewable Terraform plan
+
+      # ----------------------------------------------------------
+      # Debug execution context
+      # ----------------------------------------------------------
+      - name: Show execution context
+        run: |
+          set -euo pipefail
+
+          terraform version
+          terragrunt --version
+
+          az account show \
+            --query '{subscription:id,tenant:tenantId,identity:user.name}' \
+            --output table
+
+
+      # ----------------------------------------------------------
+      # Verify backend access before Terragrunt
+      # ----------------------------------------------------------
+      - name: Verify Terraform state access
+        run: |
+          set -euo pipefail
+
+          echo "Checking Azure Blob backend access..."
+
+          az storage blob list \
+            --account-name "${TFSTATE_STORAGE_ACCOUNT}" \
+            --container-name "${TFSTATE_CONTAINER}" \
+            --auth-mode login \
+            --num-results 1 \
+            --output none
+
+          echo "Terraform state backend access OK."
+
+
+      # ----------------------------------------------------------
+      # Plan
+      # ----------------------------------------------------------
+      - name: Plan Thanh infrastructure
         working-directory: environments/thanh
         run: |
           set -euo pipefail
-          evidence_dir="${RUNNER_TEMP}/thanh-pr-plan"
+
+          evidence_dir="${RUNNER_TEMP}/thanh-plan"
           mkdir -p "${evidence_dir}"
+
           terragrunt run \
             --source-update \
             --all \
@@ -199,14 +209,301 @@ jobs:
             -- plan \
             -input=false \
             -lock-timeout=10m \
-            -no-color 2>&1 | tee "${evidence_dir}/plan.txt"
-          sha256sum "${evidence_dir}/plan.txt" | awk '{print $1}' > "${evidence_dir}/plan.sha256"
+            -no-color \
+            2>&1 | tee "${evidence_dir}/plan.txt"
 
-      - name: Upload pull request plan evidence
+
+      # ----------------------------------------------------------
+      # Evidence
+      # ----------------------------------------------------------
+      - name: Upload plan evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: thanh-pr-plan-${{ github.event.pull_request.number }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/thanh-pr-plan/
+          name: thanh-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/thanh-plan/
           if-no-files-found: warn
           retention-days: 30
+
+
+      - name: Write plan summary
+        if: always()
+        env:
+          REQUESTED_OPERATION: ${{ inputs.operation || 'plan' }}
+        run: |
+          {
+            echo "## Thanh infrastructure plan"
+            echo
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Requested operation: \`${REQUESTED_OPERATION}\`"
+            echo "- Scope: \`environments/thanh\`"
+            echo "- Backend auth: Azure CLI session from GitHub OIDC"
+            echo "- Evidence retention: 30 days"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+
+  # ============================================================
+  # APPLY
+  # ============================================================
+  apply:
+    name: Apply Thanh
+
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
+
+    needs:
+      - plan
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    environment:
+      name: thanh
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      # IMPORTANT:
+      # Do not use ARM_USE_OIDC here.
+      #
+      # Azure/login authenticates the apply Managed Identity.
+      # Terraform/Terragrunt then use the Azure CLI session.
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
+
+
+    steps:
+
+      # ----------------------------------------------------------
+      # Safety gate
+      # ----------------------------------------------------------
+      - name: Authorize deployment
+        env:
+          CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Apply refused: Thanh deployments must run from master." >&2
+            exit 1
+          fi
+
+          if [[ "${CONFIRM_APPLY}" != "apply-thanh" ]]; then
+            echo "Apply refused: confirm_apply must exactly equal apply-thanh." >&2
+            exit 1
+          fi
+
+
+      # ----------------------------------------------------------
+      # Validate APPLY secrets
+      # ----------------------------------------------------------
+      - name: Check required environment secrets
+        env:
+          AZURE_CLIENT_ID_APPLY_VALUE: ${{ secrets.AZURE_CLIENT_ID_APPLY }}
+          AZURE_TENANT_ID_VALUE: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID_VALUE: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          POSTGRESQL_ADMIN_PASSWORD_VALUE: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for variable_name in \
+            AZURE_CLIENT_ID_APPLY_VALUE \
+            AZURE_TENANT_ID_VALUE \
+            AZURE_SUBSCRIPTION_ID_VALUE \
+            POSTGRESQL_ADMIN_PASSWORD_VALUE
+          do
+            if [[ -z "${!variable_name:-}" ]]; then
+              echo "Missing required thanh environment secret: ${variable_name}" >&2
+              exit 1
+            fi
+          done
+
+
+      # ----------------------------------------------------------
+      # Checkout exact commit that was planned
+      # ----------------------------------------------------------
+      - name: Check out approved commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+
+      # ----------------------------------------------------------
+      # Install tools
+      # ----------------------------------------------------------
+      - name: Install IaC tools
+        uses: ./.github/actions/setup-iac
+        with:
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt-version: ${{ env.TERRAGRUNT_VERSION }}
+
+
+      # ----------------------------------------------------------
+      # Login using APPLY identity
+      # ----------------------------------------------------------
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_APPLY }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+
+      # ----------------------------------------------------------
+      # Confirm correct identity
+      # ----------------------------------------------------------
+      - name: Show Apply execution context
+        run: |
+          set -euo pipefail
+
+          az account show \
+            --query '{subscription:id,tenant:tenantId,identity:user.name}' \
+            --output table
+
+
+      # ----------------------------------------------------------
+      # Confirm apply identity can access tfstate
+      # ----------------------------------------------------------
+      - name: Verify Terraform state access
+        run: |
+          set -euo pipefail
+
+          echo "Checking Azure Blob backend access..."
+
+          az storage blob list \
+            --account-name "${TFSTATE_STORAGE_ACCOUNT}" \
+            --container-name "${TFSTATE_CONTAINER}" \
+            --auth-mode login \
+            --num-results 1 \
+            --output none
+
+          echo "Terraform state backend access OK."
+
+
+      # ----------------------------------------------------------
+      # Fresh plan before apply
+      #
+      # We intentionally DO NOT compare SHA256 of console output.
+      # Terraform/Terragrunt log output is not deterministic enough
+      # to be used as an approval checksum.
+      # ----------------------------------------------------------
+      - name: Re-plan before apply
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+
+          evidence_dir="${RUNNER_TEMP}/thanh-apply"
+          mkdir -p "${evidence_dir}"
+
+          terragrunt run \
+            --source-update \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- plan \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color \
+            2>&1 | tee "${evidence_dir}/replan.txt"
+
+
+      # ----------------------------------------------------------
+      # Apply
+      # ----------------------------------------------------------
+      - name: Apply Thanh infrastructure
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+
+          terragrunt run \
+            --all \
+            --parallelism 4 \
+            --provider-cache \
+            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
+            -- apply \
+            -auto-approve \
+            -input=false \
+            -lock-timeout=10m \
+            -no-color
+
+
+      # ----------------------------------------------------------
+      # Verify deployment
+      # ----------------------------------------------------------
+      - name: Verify Thanh deployment
+        run: |
+          set -euo pipefail
+
+          evidence_dir="${RUNNER_TEMP}/thanh-apply"
+          mkdir -p "${evidence_dir}"
+
+          resource_group="thanhproject-dev-rg"
+
+          {
+            echo "=== Resource Group ==="
+
+            az group show \
+              --name "${resource_group}" \
+              --query '{name:name,state:properties.provisioningState,location:location}' \
+              --output table
+
+            echo
+            echo "=== AKS ==="
+
+            az aks show \
+              --resource-group "${resource_group}" \
+              --name thanhproject-dev-aks \
+              --query '{name:name,state:provisioningState,version:kubernetesVersion}' \
+              --output table
+
+            echo
+            echo "=== PostgreSQL Flexible Server ==="
+
+            az postgres flexible-server list \
+              --resource-group "${resource_group}" \
+              --query '[].{name:name,state:state,fqdn:fullyQualifiedDomainName}' \
+              --output table
+
+            echo
+            echo "=== Resources ==="
+
+            az resource list \
+              --resource-group "${resource_group}" \
+              --query '[].{name:name,type:type,state:properties.provisioningState}' \
+              --output table
+
+          } | tee "${evidence_dir}/verification.txt"
+
+
+      # ----------------------------------------------------------
+      # Evidence
+      # ----------------------------------------------------------
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thanh-apply-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/thanh-apply/
+          if-no-files-found: warn
+          retention-days: 30
+
+
+      - name: Write deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Thanh infrastructure apply"
+            echo
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Scope: \`environments/thanh\`"
+            echo "- Protected environment: \`thanh\`"
+            echo "- Authentication: GitHub OIDC -> Azure CLI"
+            echo "- State backend authentication: Azure CLI / Microsoft Entra ID"
+            echo "- Re-plan performed immediately before apply"
+          } >> "${GITHUB_STEP_SUMMARY}"
