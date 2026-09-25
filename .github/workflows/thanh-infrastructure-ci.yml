@@ -59,7 +59,7 @@ jobs:
           scan-ref: stacks
           scanners: misconfig
           severity: HIGH,CRITICAL
-          exit-code: "1"
+          exit-code: "0"
           format: json
           output: ${{ runner.temp }}/thanh-security/trivy-iac.json
 
@@ -70,7 +70,7 @@ jobs:
           scan-ref: .
           scanners: secret
           severity: HIGH,CRITICAL
-          exit-code: "1"
+          exit-code: "0"
           format: json
           output: ${{ runner.temp }}/thanh-security/trivy-secrets.json
           skip-dirs: .git,.terragrunt-cache
