@@ -30,11 +30,13 @@ locals {
   # the AzureRM provider.
   # -------------------------------------------------------------------------
 
-  mock_hub_resource_group_name = "${local.name_prefix}-${local.environment}-connectivity-rg"
+  # The platform stacks set their own environment labels, so their resource
+  # names do not include the application environment label ("dev").
+  mock_hub_resource_group_name = "${local.name_prefix}-connectivity-rg"
 
-  mock_hub_vnet_id = "/subscriptions/${local.connectivity_subscription_id}/resourceGroups/${local.mock_hub_resource_group_name}/providers/Microsoft.Network/virtualNetworks/${local.name_prefix}-${local.environment}-hub-vnet"
+  mock_hub_vnet_id = "/subscriptions/${local.connectivity_subscription_id}/resourceGroups/${local.mock_hub_resource_group_name}/providers/Microsoft.Network/virtualNetworks/${local.name_prefix}-connectivity-vnet"
 
-  mock_log_analytics_workspace_id = "/subscriptions/${local.management_subscription_id}/resourceGroups/${local.name_prefix}-${local.environment}-management-rg/providers/Microsoft.OperationalInsights/workspaces/${local.name_prefix}-${local.environment}-law"
+  mock_log_analytics_workspace_id = "/subscriptions/${local.management_subscription_id}/resourceGroups/${local.name_prefix}-management-rg/providers/Microsoft.OperationalInsights/workspaces/${local.name_prefix}-management-law"
 }
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,12 @@ dependency "connectivity" {
     "plan",
     "destroy"
   ]
+
+  # The existing connectivity state can contain only a subset of outputs
+  # after a partial or failed deployment. For non-apply commands, retain any
+  # real outputs and fill missing ones with the valid-format mocks above.
+  # Mocks remain unavailable to apply.
+  mock_outputs_merge_strategy_with_state = "shallow"
 }
 
 # ---------------------------------------------------------------------------

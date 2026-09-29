@@ -32,3 +32,4 @@ provider_generated.tf
 .terragrunt-cache-*
 draft.MD
 THANH_SYSTEM_RUNBOOK.md
+tfplans
