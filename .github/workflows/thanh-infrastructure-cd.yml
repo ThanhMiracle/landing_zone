@@ -53,6 +53,9 @@ env:
 
   TFSTATE_STORAGE_ACCOUNT: "thanhdepzaivl2001"
   TFSTATE_CONTAINER: "tfstate"
+  # Be explicit so CD cannot accidentally fall back to a local state file.
+  TERRAGRUNT_USE_LOCAL_BACKEND: "false"
+  TF_VAR_tfstate_storage_account: "thanhdepzaivl2001"
 
 
 jobs:

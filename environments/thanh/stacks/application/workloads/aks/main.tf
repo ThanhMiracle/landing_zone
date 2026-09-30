@@ -142,7 +142,24 @@ module "aks_diagnostics" {
     "kube-audit-admin",
     "guard",
     "cluster-autoscaler",
+    # Keep the categories already enabled on the adopted diagnostic setting.
+    "cloud-controller-manager",
+    "csi-azuredisk-controller",
+    "csi-azurefile-controller",
+    "csi-snapshot-controller",
+    "fleet-member-agent",
+    "fleet-member-net-controller-manager",
+    "fleet-mcs-controller-manager",
+    "karpenter-events",
   ]
 
   metric_categories = ["AllMetrics"]
+}
+
+# This setting already exists in Azure but was created outside the shared
+# Terraform state. Adopt it during the next approved apply instead of trying
+# to create a duplicate setting. The import block is a no-op after adoption.
+import {
+  to = module.aks_diagnostics[0].azurerm_monitor_diagnostic_setting.this
+  id = "/subscriptions/223b3cc4-6941-480a-81ec-4825adcd8b0e/resourceGroups/thanhproject-dev-rg/providers/Microsoft.ContainerService/managedClusters/thanhproject-dev-aks|thanhproject-dev-aks-diag"
 }

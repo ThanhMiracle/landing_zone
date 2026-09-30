@@ -32,7 +32,10 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   TG_NON_INTERACTIVE: "true"
-  TERRAGRUNT_USE_LOCAL_BACKEND: "true"
+  # CI plans must use the same shared state as CD and local deployments.
+  # A local backend cannot see resources already managed in Azure.
+  TERRAGRUNT_USE_LOCAL_BACKEND: "false"
+  TF_VAR_tfstate_storage_account: "thanhdepzaivl2001"
   TERRAFORM_VERSION: "1.14.4"
   TERRAGRUNT_VERSION: "1.1.1"
 
