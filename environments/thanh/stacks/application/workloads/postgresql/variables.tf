@@ -43,6 +43,12 @@ variable "log_analytics_workspace_id" {
   type        = string
 }
 
+variable "adopt_existing_resources" {
+  description = "Whether to import existing PostgreSQL diagnostics and connection-secret resources into this stack's Terraform state. Enable only for a one-time state adoption."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to all resources."
   type        = map(string)

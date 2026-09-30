@@ -40,6 +40,16 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
 # ---------------------------------------------------------------------------
 # Store the private PostgreSQL connection URL in Key Vault. URL encoding keeps
 # password characters valid inside the URI.
+# This metadata-only data source returns secret IDs, names, tags, and enabled
+# status. It does not return secret values. It is evaluated only when adopting
+# resources that already exist outside Terraform state.
+data "azurerm_key_vault_secrets" "existing" {
+  count    = var.adopt_existing_resources ? 1 : 0
+  provider = azurerm.workload
+
+  key_vault_id = var.key_vault_id
+}
+
 resource "azurerm_key_vault_secret" "postgresql_connection_url" {
   provider     = azurerm.workload
   name         = "postgresql-connection-url"
@@ -48,6 +58,20 @@ resource "azurerm_key_vault_secret" "postgresql_connection_url" {
   content_type = "application/vnd.postgresql.connection-string"
 
   depends_on = [module.postgresql]
+}
+
+# Import the current version of a pre-existing secret. A fresh environment
+# leaves adoption disabled and creates the secret normally. Terraform obtains
+# the versioned ID from Key Vault metadata, so no environment-specific ID is
+# committed or injected through the pipeline.
+import {
+  for_each = var.adopt_existing_resources ? toset([
+    for secret in data.azurerm_key_vault_secrets.existing[0].secrets : secret.id
+    if secret.name == "postgresql-connection-url"
+  ]) : toset([])
+
+  to = azurerm_key_vault_secret.postgresql_connection_url
+  id = each.value
 }
 
 # PostgreSQL Flexible Server
@@ -117,9 +141,23 @@ module "postgresql_diagnostics" {
     "PostgreSQLLogs",
     "PostgreSQLFlexQueryStoreRuntime",
     "PostgreSQLFlexQueryStoreWaitStats",
+    "PostgreSQLFlexSessions",
+    "PostgreSQLFlexTableStats",
+    "PostgreSQLFlexDatabaseXacts",
+    "PostgreSQLFlexPGBouncer",
+    "PostgreSQLQueryStoreSqlText",
   ]
 
   metric_categories = [
     "AllMetrics"
   ]
+}
+
+# Import is opt-in so a new environment does not try to adopt a resource that
+# does not exist yet. IDs are derived from normal stack inputs, not Thanh
+# specific values.
+import {
+  for_each = var.adopt_existing_resources ? toset(["existing"]) : toset([])
+  to       = module.postgresql_diagnostics[0].azurerm_monitor_diagnostic_setting.this
+  id       = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${var.name_prefix}-${var.environment}-psql|${var.name_prefix}-${var.environment}-psql-diag"
 }

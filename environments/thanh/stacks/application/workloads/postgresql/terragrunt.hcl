@@ -109,6 +109,8 @@ inputs = {
   resource_group_name = dependency.baseline.outputs.spoke_resource_group_name
 
   log_analytics_workspace_id = dependency.management.outputs.log_analytics_workspace_id
+  # Temporary state recovery for resources that already exist in Azure.
+  adopt_existing_resources = true
 
   tags = local.env_vars.locals.common_tags
 }
