@@ -35,9 +35,9 @@ module "key_vault" {
 
 # The Terraform deployment identity writes application connection secrets to
 # this RBAC-enabled vault. AKS receives a separate read-only assignment.
-#resource "azurerm_role_assignment" "terraform_key_vault_secrets_officer" {
-#  provider             = azurerm.workload
-#  scope                = module.key_vault.key_vault_id
-#  role_definition_name = "Key Vault Secrets Officer"
-#  principal_id         = data.azurerm_client_config.current.object_id
-#}
+resource "azurerm_role_assignment" "terraform_key_vault_secrets_officer" {
+  provider             = azurerm.workload
+  scope                = module.key_vault.key_vault_id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
