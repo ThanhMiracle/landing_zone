@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+
     paths:
       - ".github/actions/setup-iac/**"
       - ".github/workflows/thanh-infrastructure-*.yml"
@@ -27,16 +28,20 @@ on:
         required: false
         type: string
 
+
 permissions:
   contents: read
+
 
 concurrency:
   group: thanh-infrastructure-deployment
   cancel-in-progress: false
 
+
 defaults:
   run:
     shell: bash
+
 
 env:
   TF_IN_AUTOMATION: "true"
@@ -55,8 +60,10 @@ jobs:
   # ============================================================
   # PLAN
   # ============================================================
+
   plan:
     name: Plan Thanh
+
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -71,8 +78,10 @@ jobs:
       # Terraform provider v4 requires subscription ID.
       #
       # Do NOT set ARM_USE_OIDC here.
-      # azure/login performs OIDC authentication and Terraform/Terragrunt
-      # consumes the authenticated Azure CLI session.
+      #
+      # azure/login performs OIDC authentication.
+      # Terraform/Terragrunt consumes the authenticated
+      # Azure CLI session.
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
@@ -82,6 +91,7 @@ jobs:
       # ----------------------------------------------------------
       # Validate request
       # ----------------------------------------------------------
+
       - name: Validate deployment request
         if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
         env:
@@ -101,8 +111,9 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Validate secrets
+      # Validate PLAN secrets
       # ----------------------------------------------------------
+
       - name: Check required environment secrets
         env:
           AZURE_CLIENT_ID_VALUE: ${{ secrets.AZURE_CLIENT_ID }}
@@ -128,6 +139,7 @@ jobs:
       # ----------------------------------------------------------
       # Checkout
       # ----------------------------------------------------------
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -137,6 +149,7 @@ jobs:
       # ----------------------------------------------------------
       # Install Terraform / Terragrunt
       # ----------------------------------------------------------
+
       - name: Install IaC tools
         uses: ./.github/actions/setup-iac
         with:
@@ -145,8 +158,9 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Azure login
+      # Azure PLAN identity login
       # ----------------------------------------------------------
+
       - name: Sign in to Azure with OIDC
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
@@ -158,6 +172,7 @@ jobs:
       # ----------------------------------------------------------
       # Debug execution context
       # ----------------------------------------------------------
+
       - name: Show execution context
         run: |
           set -euo pipefail
@@ -165,14 +180,18 @@ jobs:
           terraform version
           terragrunt --version
 
+          echo
+          echo "Azure execution context:"
+
           az account show \
             --query '{subscription:id,tenant:tenantId,identity:user.name}' \
             --output table
 
 
       # ----------------------------------------------------------
-      # Verify backend access before Terragrunt
+      # Verify Terraform backend access
       # ----------------------------------------------------------
+
       - name: Verify Terraform state access
         run: |
           set -euo pipefail
@@ -190,19 +209,30 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Plan
+      # PLAN
+      #
+      # IMPORTANT:
+      #
+      # --out-dir stores an individual Terraform plan for every
+      # Terragrunt unit.
+      #
+      # These plans will later be downloaded by the APPLY job.
       # ----------------------------------------------------------
+
       - name: Plan Thanh infrastructure
         working-directory: environments/thanh
         run: |
           set -euo pipefail
 
           evidence_dir="${RUNNER_TEMP}/thanh-plan"
+
           mkdir -p "${evidence_dir}"
+          mkdir -p "./tfplans"
 
           terragrunt run \
             --source-update \
             --all \
+            --out-dir ./tfplans \
             --parallelism 4 \
             --provider-cache \
             --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
@@ -214,8 +244,39 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Evidence
+      # Show saved plan files
       # ----------------------------------------------------------
+
+      - name: Show saved Terraform plans
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+
+          echo "Saved Terraform/Terragrunt plans:"
+          echo
+
+          find ./tfplans -type f -print
+
+
+      # ----------------------------------------------------------
+      # Upload BINARY Terraform plans
+      #
+      # These are the plans that the APPLY job will consume.
+      # ----------------------------------------------------------
+
+      - name: Upload Terraform plans
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: thanh-tfplans-${{ github.run_id }}-${{ github.run_attempt }}
+          path: environments/thanh/tfplans/
+          if-no-files-found: error
+          retention-days: 1
+
+
+      # ----------------------------------------------------------
+      # Upload human-readable plan evidence
+      # ----------------------------------------------------------
+
       - name: Upload plan evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -225,6 +286,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+
+      # ----------------------------------------------------------
+      # Summary
+      # ----------------------------------------------------------
 
       - name: Write plan summary
         if: always()
@@ -239,6 +304,8 @@ jobs:
             echo "- Requested operation: \`${REQUESTED_OPERATION}\`"
             echo "- Scope: \`environments/thanh\`"
             echo "- Backend auth: Azure CLI session from GitHub OIDC"
+            echo "- Terraform plans: saved using Terragrunt --out-dir"
+            echo "- Plan artifact: \`thanh-tfplans-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
             echo "- Evidence retention: 30 days"
           } >> "${GITHUB_STEP_SUMMARY}"
 
@@ -246,11 +313,14 @@ jobs:
   # ============================================================
   # APPLY
   # ============================================================
+
   apply:
     name: Apply Thanh
 
+    # Apply only when manually requested.
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'apply'
 
+    # The PLAN job MUST succeed first.
     needs:
       - plan
 
@@ -266,20 +336,21 @@ jobs:
 
     env:
       # IMPORTANT:
+      #
       # Do not use ARM_USE_OIDC here.
       #
-      # Azure/login authenticates the apply Managed Identity.
-      # Terraform/Terragrunt then use the Azure CLI session.
+      # azure/login authenticates the APPLY Managed Identity.
+      # Terraform/Terragrunt then consume the Azure CLI session.
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       TF_VAR_postgresql_admin_password: ${{ secrets.POSTGRESQL_ADMIN_PASSWORD }}
-
 
     steps:
 
       # ----------------------------------------------------------
       # Safety gate
       # ----------------------------------------------------------
+
       - name: Authorize deployment
         env:
           CONFIRM_APPLY: ${{ inputs.confirm_apply }}
@@ -300,6 +371,7 @@ jobs:
       # ----------------------------------------------------------
       # Validate APPLY secrets
       # ----------------------------------------------------------
+
       - name: Check required environment secrets
         env:
           AZURE_CLIENT_ID_APPLY_VALUE: ${{ secrets.AZURE_CLIENT_ID_APPLY }}
@@ -323,8 +395,9 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Checkout exact commit that was planned
+      # Checkout EXACT commit that was planned
       # ----------------------------------------------------------
+
       - name: Check out approved commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -333,8 +406,11 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Install tools
+      # Install Terraform / Terragrunt
+      #
+      # Same versions as PLAN job.
       # ----------------------------------------------------------
+
       - name: Install IaC tools
         uses: ./.github/actions/setup-iac
         with:
@@ -343,8 +419,45 @@ jobs:
 
 
       # ----------------------------------------------------------
+      # Download EXACT plans created by PLAN job
+      # ----------------------------------------------------------
+
+      - name: Download Terraform plans
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: thanh-tfplans-${{ github.run_id }}-${{ github.run_attempt }}
+          path: environments/thanh/tfplans/
+
+
+      # ----------------------------------------------------------
+      # Verify downloaded plans
+      # ----------------------------------------------------------
+
+      - name: Verify downloaded Terraform plans
+        working-directory: environments/thanh
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d "./tfplans" ]]; then
+            echo "Terraform plan directory does not exist." >&2
+            exit 1
+          fi
+
+          if [[ -z "$(find ./tfplans -type f -print -quit)" ]]; then
+            echo "Terraform plan directory is empty." >&2
+            exit 1
+          fi
+
+          echo "Downloaded Terraform plans:"
+          echo
+
+          find ./tfplans -type f -print
+
+
+      # ----------------------------------------------------------
       # Login using APPLY identity
       # ----------------------------------------------------------
+
       - name: Sign in to Azure with OIDC
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
@@ -354,11 +467,15 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Confirm correct identity
+      # Confirm correct APPLY identity
       # ----------------------------------------------------------
+
       - name: Show Apply execution context
         run: |
           set -euo pipefail
+
+          echo "Apply identity:"
+          echo
 
           az account show \
             --query '{subscription:id,tenant:tenantId,identity:user.name}' \
@@ -366,8 +483,9 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Confirm apply identity can access tfstate
+      # Confirm APPLY identity can access tfstate
       # ----------------------------------------------------------
+
       - name: Verify Terraform state access
         run: |
           set -euo pipefail
@@ -385,36 +503,18 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Fresh plan before apply
+      # APPLY SAVED PLAN
       #
-      # We intentionally DO NOT compare SHA256 of console output.
-      # Terraform/Terragrunt log output is not deterministic enough
-      # to be used as an approval checksum.
+      # IMPORTANT:
+      #
+      # There is NO re-plan here.
+      #
+      # Terragrunt uses the same --out-dir that was generated by
+      # the PLAN job.
+      #
+      # Therefore the APPLY job consumes the exact saved plans.
       # ----------------------------------------------------------
-      - name: Re-plan before apply
-        working-directory: environments/thanh
-        run: |
-          set -euo pipefail
 
-          evidence_dir="${RUNNER_TEMP}/thanh-apply"
-          mkdir -p "${evidence_dir}"
-
-          terragrunt run \
-            --source-update \
-            --all \
-            --parallelism 4 \
-            --provider-cache \
-            --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
-            -- plan \
-            -input=false \
-            -lock-timeout=10m \
-            -no-color \
-            2>&1 | tee "${evidence_dir}/replan.txt"
-
-
-      # ----------------------------------------------------------
-      # Apply
-      # ----------------------------------------------------------
       - name: Apply Thanh infrastructure
         working-directory: environments/thanh
         run: |
@@ -422,11 +522,11 @@ jobs:
 
           terragrunt run \
             --all \
+            --out-dir ./tfplans \
             --parallelism 4 \
             --provider-cache \
             --provider-cache-dir "${RUNNER_TEMP}/terragrunt-provider-cache" \
             -- apply \
-            -auto-approve \
             -input=false \
             -lock-timeout=10m \
             -no-color
@@ -435,11 +535,13 @@ jobs:
       # ----------------------------------------------------------
       # Verify deployment
       # ----------------------------------------------------------
+
       - name: Verify Thanh deployment
         run: |
           set -euo pipefail
 
           evidence_dir="${RUNNER_TEMP}/thanh-apply"
+
           mkdir -p "${evidence_dir}"
 
           resource_group="thanhproject-dev-rg"
@@ -481,8 +583,9 @@ jobs:
 
 
       # ----------------------------------------------------------
-      # Evidence
+      # Upload deployment evidence
       # ----------------------------------------------------------
+
       - name: Upload deployment evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -492,6 +595,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+
+      # ----------------------------------------------------------
+      # Deployment summary
+      # ----------------------------------------------------------
 
       - name: Write deployment summary
         if: always()
@@ -505,5 +612,6 @@ jobs:
             echo "- Protected environment: \`thanh\`"
             echo "- Authentication: GitHub OIDC -> Azure CLI"
             echo "- State backend authentication: Azure CLI / Microsoft Entra ID"
-            echo "- Re-plan performed immediately before apply"
+            echo "- Apply source: saved Terraform plans from PLAN job"
+            echo "- No re-plan performed during APPLY job"
           } >> "${GITHUB_STEP_SUMMARY}"
