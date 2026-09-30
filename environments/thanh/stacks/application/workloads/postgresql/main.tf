@@ -40,13 +40,14 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgresql" {
 # ---------------------------------------------------------------------------
 # Store the private PostgreSQL connection URL in Key Vault. URL encoding keeps
 # password characters valid inside the URI.
-# This metadata-only data source returns secret IDs, names, tags, and enabled
-# status. It does not return secret values. It is evaluated only when adopting
-# resources that already exist outside Terraform state.
-data "azurerm_key_vault_secrets" "existing" {
+# The single-secret data source returns the versioned ID required by Terraform
+# import. It is evaluated only when adopting resources that already exist
+# outside Terraform state.
+data "azurerm_key_vault_secret" "existing_connection_url" {
   count    = var.adopt_existing_resources ? 1 : 0
   provider = azurerm.workload
 
+  name         = "postgresql-connection-url"
   key_vault_id = var.key_vault_id
 }
 
@@ -62,13 +63,10 @@ resource "azurerm_key_vault_secret" "postgresql_connection_url" {
 
 # Import the current version of a pre-existing secret. A fresh environment
 # leaves adoption disabled and creates the secret normally. Terraform obtains
-# the versioned ID from Key Vault metadata, so no environment-specific ID is
-# committed or injected through the pipeline.
+# the versioned ID dynamically, so no environment-specific ID is committed or
+# injected through the pipeline.
 import {
-  for_each = var.adopt_existing_resources ? toset([
-    for secret in data.azurerm_key_vault_secrets.existing[0].secrets : secret.id
-    if secret.name == "postgresql-connection-url"
-  ]) : toset([])
+  for_each = var.adopt_existing_resources ? toset([data.azurerm_key_vault_secret.existing_connection_url[0].id]) : toset([])
 
   to = azurerm_key_vault_secret.postgresql_connection_url
   id = each.value
