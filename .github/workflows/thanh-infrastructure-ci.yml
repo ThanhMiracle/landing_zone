@@ -91,6 +91,11 @@ jobs:
     name: Format and validate Thanh
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # This job only validates configuration and does not authenticate to Azure.
+    # Keep its backend local so initialization is fully offline. The separate
+    # Azure-authenticated plan job inherits the shared-backend setting above.
+    env:
+      TERRAGRUNT_USE_LOCAL_BACKEND: "true"
 
     steps:
       - name: Check out repository
