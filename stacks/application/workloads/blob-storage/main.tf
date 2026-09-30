@@ -59,5 +59,15 @@ module "blob_storage_diagnostics" {
   target_resource_id         = "${module.blob_storage.storage_account_id}/blobServices/default"
   log_analytics_workspace_id = var.log_analytics_workspace_id
   log_categories             = ["StorageRead", "StorageWrite", "StorageDelete"]
-  metric_categories          = ["Transaction"]
+  # Preserve every metric category already enabled on the existing setting.
+  metric_categories = ["Transaction", "Capacity"]
+}
+
+# Import is opt-in so a new environment does not try to adopt a resource that
+# does not exist yet. IDs are derived from the deployed storage account and
+# naming inputs, not from Thanh-specific values.
+import {
+  for_each = var.adopt_existing_diagnostic_setting ? toset(["existing"]) : toset([])
+  to       = module.blob_storage_diagnostics[0].azurerm_monitor_diagnostic_setting.this
+  id       = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${substr(lower("${var.name_prefix}${var.environment}st"), 0, 24)}/blobServices/default|${var.name_prefix}-${var.environment}-blob-diag"
 }

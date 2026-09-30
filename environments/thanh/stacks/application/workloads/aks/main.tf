@@ -156,10 +156,11 @@ module "aks_diagnostics" {
   metric_categories = ["AllMetrics"]
 }
 
-# This setting already exists in Azure but was created outside the shared
-# Terraform state. Adopt it during the next approved apply instead of trying
-# to create a duplicate setting. The import block is a no-op after adoption.
+# Import is opt-in so a new environment does not try to adopt a resource that
+# does not exist yet. IDs are derived from the deployed cluster and naming
+# inputs, not from Thanh-specific values.
 import {
-  to = module.aks_diagnostics[0].azurerm_monitor_diagnostic_setting.this
-  id = "/subscriptions/223b3cc4-6941-480a-81ec-4825adcd8b0e/resourceGroups/thanhproject-dev-rg/providers/Microsoft.ContainerService/managedClusters/thanhproject-dev-aks|thanhproject-dev-aks-diag"
+  for_each = var.adopt_existing_diagnostic_setting ? toset(["existing"]) : toset([])
+  to       = module.aks_diagnostics[0].azurerm_monitor_diagnostic_setting.this
+  id       = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.name_prefix}-${var.environment}-aks|${var.name_prefix}-${var.environment}-aks-diag"
 }

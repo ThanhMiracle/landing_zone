@@ -71,6 +71,8 @@ inputs = {
   resource_group_name            = dependency.baseline.outputs.spoke_resource_group_name
   aks_kubelet_identity_object_id = dependency.aks.outputs.aks_kubelet_identity_object_id
   log_analytics_workspace_id     = dependency.management.outputs.log_analytics_workspace_id
+  # Temporary state recovery for the setting that already exists in Azure.
+  adopt_existing_diagnostic_setting = true
 
   tags = local.env_vars.locals.common_tags
 }

@@ -88,6 +88,12 @@ variable "log_analytics_workspace_id" {
   type        = string
 }
 
+variable "adopt_existing_diagnostic_setting" {
+  description = "Whether to import an existing AKS diagnostic setting into this stack's Terraform state. Enable only for a one-time state adoption."
+  type        = bool
+  default     = false
+}
+
 variable "aks_subnet_id" {
   description = "Resource ID của subnet 'aks' từ baseline stack. Null = dùng default VNet (backward compat)."
   type        = string
