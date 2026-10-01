@@ -72,7 +72,7 @@ locals {
 
   # Public IP assigned to the platform/nginx LoadBalancer service. Azure
   # Firewall exposes it through a DNAT rule on the firewall frontend.
-  aks_ingress_load_balancer_ip = "135.149.158.217"
+  aks_ingress_load_balancer_ip = "10.1.3.33"
 
   # ── Hub Subnets (cho Connectivity stack) ──────────────────────────────────
   # AzureFirewallSubnet: /26 minimum
